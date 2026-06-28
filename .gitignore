@@ -1,0 +1,5 @@
+data/sessions/*
+data/history/*
+data/student/*
+__pycache__/
+*.pyc
