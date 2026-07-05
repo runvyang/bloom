@@ -435,7 +435,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       </div>
       <div id="input-area">
         <div class="inp-row">
-          <textarea id="ta" placeholder="输入消息… (Enter 发送 · 按住🎤说话松开发送)" rows="1"></textarea>
+          <textarea id="ta" placeholder="输入消息… (Enter 发送 · 按住🎤说话)" rows="1"></textarea>
           <button id="mic-btn" onmousedown="startVoice(event)" onmouseup="stopVoice()" onmouseleave="stopVoice()" ontouchstart="startVoice(event)" ontouchend="stopVoice()" title="按住说话，松开发送">🎤</button>
           <button id="send-btn" onclick="sendMsg()" title="Send (Enter)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
@@ -686,14 +686,6 @@ function stopVoice(){
   btn.classList.remove('recording');
   try { recognition.stop(); } catch(e) {}
   setStatus('Ready');
-
-  // Auto-send and clear if we got text
-  if (voiceText.trim()) {
-    setTimeout(() => {
-      document.getElementById('ta').value = '';
-      sendMsg();
-    }, 200);
-  }
 }
 
 // Initialize voice on first interaction
