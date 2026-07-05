@@ -37,19 +37,19 @@ llm.py                  OpenRouterClient — OpenAI-compatible wrapper for DeepS
 session_manager.py      JSON file-based session store (data/sessions/*.json)
 memory.py               mem0.ai client for long-term cross-session memory retrieval
 utils.py                read_file / write_file / append_file helpers
-data/                   Markdown world model files (the persistent source of truth)
-  student_state.md        Student knowledge tracking table (grades 1-12 + olympiad)
+data/                   Runtime data (mostly gitignored)
+  student_state.md        Template — copied per-user on first chat
+  history/*.log           Per-user teaching logs (legacy)
+courses/math/           Readonly math course prompts
   world_model.md          Core teaching philosophy (probabilistic, evidence-driven)
   planner.md              Real-time evaluation & curriculum planning rules
   teacher_prompt.md       JSON output schema for LLM evaluation responses
   world_model_skills.md   Agent skill manual — read/record/update/plan loop
   evaluator.md            Rules for calibration and anti-bias on mastery updates
-  history/*.log           Per-user teaching logs
 services/               LiteLLM proxy config
 static/                 Frontend SPAs
   index.html              Dark-theme production UI with SSE streaming
   index_ds.html           Simpler gradient-themed UI
-math/                   Math-specific planner and history (separate domain)
 ```
 
 ## Core Teaching Loop
@@ -84,13 +84,13 @@ Primary: DeepSeek (deepseek-v4-flash via `api.deepseek.com`). The `OpenRouterCli
 
 The teaching logic is not coded in Python — it's encoded in Markdown prompt files that the LLM reads and executes at runtime. The Python layer is a thin orchestration shell that: loads markdown files, assembles context, calls the LLM, and persists results. Key logic files:
 
-- `data/world_model.md` — the LLM's identity and core teaching principles
-- `data/planner.md` — how to choose the next knowledge point to teach
-- `data/teacher_prompt.md` — exact JSON schema the LLM must output for eval
-- `data/evaluator.md` — calibration rules: caps mastery updates at ±0.15 per session, requires 2+ repeated errors to confirm a misconception, uses formula `final_mastery = 0.5 * teacher_estimate + 0.3 * correctness_rate + 0.2 * consistency_score`
-- `data/world_model_skills.md` — the execution loop: Read State → Record Observation → Update State → Plan Next Step
+- `courses/math/world_model.md` — the LLM's identity and core teaching principles
+- `courses/math/planner.md` — how to choose the next knowledge point to teach
+- `courses/math/teacher_prompt.md` — exact JSON schema the LLM must output for eval
+- `courses/math/evaluator.md` — calibration rules: caps mastery updates at ±0.15 per session, requires 2+ repeated errors to confirm a misconception, uses formula `final_mastery = 0.5 * teacher_estimate + 0.3 * correctness_rate + 0.2 * consistency_score`
+- `courses/math/world_model_skills.md` — the execution loop: Read State → Record Observation → Update State → Plan Next Step
 
-The `math/planner.md` defines a node scoring algorithm for selecting the next teaching target: `score = (1 - mastery) * 0.5 + misconception_weight * 0.3 + prerequisite_gap * 0.1 + review_need * 0.1`. Active misconceptions always win regardless of score.
+The `courses/math/planner.md` defines a node scoring algorithm for selecting the next teaching target: `score = (1 - mastery) * 0.5 + misconception_weight * 0.3 + prerequisite_gap * 0.1 + review_need * 0.1`. Active misconceptions always win regardless of score.
 
 ## Known Issues / Gotchas
 

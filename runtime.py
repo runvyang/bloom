@@ -83,9 +83,9 @@ class ChatRuntime:
         if not os.path.exists(student_state_path):
             copy_file("data/student_state.md", student_state_path)
         student_state = read_file(student_state_path)
-        world_model = read_file("data/world_model.md")
-        plan = read_file("data/planner.md")
-        teacher_prompt = read_file("data/teacher_prompt.md")
+        world_model = read_file("courses/math/world_model.md")
+        plan = read_file("courses/math/planner.md")
+        teacher_prompt = read_file("courses/math/teacher_prompt.md")
         
         return {
             "session": session,
