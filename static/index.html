@@ -155,6 +155,17 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 }
 .m-bubble:hover .copy-btn{opacity:1}
 .copy-btn:hover{color:var(--text);background:var(--surface3)}
+.speak-btn{
+  position:absolute;top:8px;right:36px;
+  width:24px;height:24px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:5px;
+  font-size:11px;color:var(--text3);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .15s;cursor:pointer;
+}
+.m-bubble:hover .speak-btn{opacity:1}
+.speak-btn:hover{color:var(--text);background:var(--surface3)}
+.speak-btn.playing{color:var(--accent);background:var(--accent-lo);border-color:var(--accent)}
 
 /* Streaming cursor */
 .cur{
@@ -424,8 +435,8 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       </div>
       <div id="input-area">
         <div class="inp-row">
-          <textarea id="ta" placeholder="输入消息… (Enter 发送 · Shift+Enter 换行 · 🎤 语音输入)" rows="1"></textarea>
-          <button id="mic-btn" onclick="toggleVoice()" title="语音输入">🎤</button>
+          <textarea id="ta" placeholder="输入消息… (Enter 发送 · 按住🎤说话松开发送)" rows="1"></textarea>
+          <button id="mic-btn" onmousedown="startVoice(event)" onmouseup="stopVoice()" onmouseleave="stopVoice()" ontouchstart="startVoice(event)" ontouchend="stopVoice()" title="按住说话，松开发送">🎤</button>
           <button id="send-btn" onclick="sendMsg()" title="Send (Enter)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2.5"
@@ -615,9 +626,9 @@ marked.use({ gfm: true, breaks: true });
   });
 })();
 
-// ─── Voice Input ────────────────────────────────────────
+// ─── Voice Input (press-and-hold like WeChat) ────────────
 let recognition = null;
-let isRecording = false;
+let voiceText = '';
 
 function initVoice(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -636,64 +647,56 @@ function initVoice(){
     for (let i = event.resultIndex; i < event.results.length; i++) {
       transcript += event.results[i][0].transcript;
     }
+    voiceText = transcript;
+    document.getElementById('ta').value = transcript;
     const ta = document.getElementById('ta');
-    ta.value = transcript;
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
-    ta.focus();
   };
 
   recognition.onerror = (event) => {
     console.log('Voice error:', event.error);
-    stopRecording();
-    if (event.error === 'not-allowed') {
-      toast('Microphone access denied');
-    }
+    stopVoice();
   };
 
   recognition.onend = () => {
-    if (isRecording) {
-      // Auto-restart for continuous listening
+    const btn = document.getElementById('mic-btn');
+    if (btn.classList.contains('recording')) {
       try { recognition.start(); } catch(e) {}
     }
   };
 }
 
-function toggleVoice(){
-  if (!recognition) { toast('Voice input not supported in this browser'); return; }
-  if (isRecording) {
-    stopRecording();
-  } else {
-    startRecording();
-  }
+function startVoice(e){
+  e.preventDefault();
+  if (!recognition) initVoice();
+  if (!recognition) { toast('Voice not supported'); return; }
+  voiceText = '';
+  document.getElementById('ta').value = '';
+  try { recognition.start(); } catch(e) {}
+  const btn = document.getElementById('mic-btn');
+  btn.textContent = '🔴';
+  btn.classList.add('recording');
+  setStatus('Listening… hold to speak', 'loading');
 }
 
-function startRecording(){
-  try {
-    recognition.start();
-    isRecording = true;
-    const btn = document.getElementById('mic-btn');
-    btn.textContent = '🔴';
-    btn.classList.add('recording');
-    btn.title = '点击停止语音输入';
-    setStatus('Listening…', 'loading');
-    toast('🎤 正在聆听…请说话');
-  } catch(e) {
-    console.log('Voice start error:', e);
-  }
-}
-
-function stopRecording(){
-  isRecording = false;
-  try { recognition.stop(); } catch(e) {}
+function stopVoice(){
   const btn = document.getElementById('mic-btn');
   btn.textContent = '🎤';
   btn.classList.remove('recording');
-  btn.title = '语音输入';
+  try { recognition.stop(); } catch(e) {}
   setStatus('Ready');
+
+  // Auto-send and clear if we got text
+  if (voiceText.trim()) {
+    setTimeout(() => {
+      document.getElementById('ta').value = '';
+      sendMsg();
+    }, 200);
+  }
 }
 
-// Initialize voice on first click (browsers need user gesture)
+// Initialize voice on first interaction
 document.addEventListener('click', function initVoiceOnce(){
   if (!recognition) initVoice();
 }, {once: true});
@@ -1224,7 +1227,21 @@ function dropBubble(bid){ document.getElementById(`w${bid}`)?.remove(); }
 function removeEmpty(){ document.querySelector('.empty')?.remove(); }
 function cursor(el){ el.innerHTML = '<span class="cur"></span>'; }
 
+let currentSpeech = null;
+
 function addCopyBtn(bubble, text){
+  // Speak button
+  const spk = document.createElement('button');
+  spk.className = 'speak-btn';
+  spk.title = 'Read aloud';
+  spk.textContent = '🔊';
+  spk.onclick = (e) => {
+    e.stopPropagation();
+    speakText(text, spk);
+  };
+  bubble.appendChild(spk);
+
+  // Copy button
   const btn = document.createElement('button');
   btn.className = 'copy-btn';
   btn.title = 'Copy';
@@ -1234,6 +1251,33 @@ function addCopyBtn(bubble, text){
     navigator.clipboard.writeText(text).then(() => toast('Copied!'));
   };
   bubble.appendChild(btn);
+}
+
+function speakText(text, btn){
+  // If already speaking, stop
+  if (currentSpeech) {
+    speechSynthesis.cancel();
+    currentSpeech = null;
+    document.querySelectorAll('.speak-btn.playing').forEach(b => b.classList.remove('playing'));
+    if (btn && btn.classList.contains('playing')) return;
+  }
+  // Strip markdown/LaTeX for cleaner speech
+  const clean = text.replace(/\$\$[\s\S]*?\$\$/g, '').replace(/\$([^$]+)\$/g, '$1').replace(/[*_#`\[\]()]/g, '').trim();
+  if (!clean) return;
+  const utter = new SpeechSynthesisUtterance(clean);
+  utter.lang = 'zh-CN';
+  utter.rate = 0.95;
+  utter.onend = () => {
+    currentSpeech = null;
+    if (btn) btn.classList.remove('playing');
+  };
+  utter.onerror = () => {
+    currentSpeech = null;
+    if (btn) btn.classList.remove('playing');
+  };
+  currentSpeech = utter;
+  if (btn) btn.classList.add('playing');
+  speechSynthesis.speak(utter);
 }
 
 function scrollBot(){
