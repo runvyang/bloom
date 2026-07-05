@@ -184,44 +184,14 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 #send-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 .inp-hint{font-size:11px;color:var(--text3);margin-top:6px;padding-left:2px}
 
-/* ─── Plan sidebar ────────────────────────────────────── */
-#sidebar{
-  width:310px;border-left:1px solid var(--border);
-  background:var(--surface);display:flex;flex-direction:column;
-  overflow:hidden;flex-shrink:0;
-  transition:width .25s ease,opacity .2s ease;
-}
-#sidebar.off{width:0;opacity:0;pointer-events:none}
-
-.sb-hdr{
-  padding:12px 15px;border-bottom:1px solid var(--border);
-  font-size:11px;font-weight:700;color:var(--text3);
-  text-transform:uppercase;letter-spacing:.08em;
-  display:flex;align-items:center;justify-content:space-between;
-  white-space:nowrap;flex-shrink:0;
-}
-#plan-wrap{flex:1;overflow-y:auto;padding:14px}
-#plan-wrap::-webkit-scrollbar{width:3px}
-#plan-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-
-.plan-empty{font-size:13px;color:var(--text3);text-align:center;padding:28px 12px;line-height:1.7}
-
-/* Plan cards */
-.pcard{
+/* ─── Course selector ─────────────────────────────────── */
+#course-sel{
   background:var(--surface2);border:1px solid var(--border);
-  border-left:3px solid var(--accent);
-  border-radius:0 8px 8px 0;
-  padding:11px 13px;margin-bottom:10px;
-  animation:pop .25s ease;
+  border-radius:7px;color:var(--text);padding:5px 8px;
+  font-size:12px;font-family:var(--sans);outline:none;
+  cursor:pointer;margin-right:6px;
 }
-.pcard-key{
-  font-size:10px;font-weight:700;color:var(--accent);
-  text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;
-}
-.pcard-val{
-  font-size:13px;color:var(--text2);line-height:1.6;
-  word-break:break-word;white-space:pre-wrap;
-}
+#course-sel:focus{border-color:var(--accent)}
 
 /* ─── Status bar ──────────────────────────────────────── */
 #sbar{
@@ -316,7 +286,11 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
     </div>
     <div class="sp"></div>
     <div class="hdr-btns">
-      <button class="btn-icon" onclick="togglePlan()" title="Toggle plan panel">📋</button>
+      <select id="course-sel" onchange="switchCourse()">
+        <option value="math">📐 Math</option>
+        <option value="english">🇬🇧 English</option>
+        <option value="coding">💻 Coding</option>
+      </select>
       <button class="btn-icon" onclick="newSession()" title="New session">↺</button>
       <button class="btn-icon" onclick="clearChat()" title="Clear messages">🗑</button>
       <span id="user-label" style="font-size:12px;color:var(--text2);margin-right:2px"></span>
@@ -350,17 +324,6 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
           </button>
         </div>
         <div class="inp-hint">Enter 发送 · Shift+Enter 换行 · <kbd style="background:var(--surface3);border:1px solid var(--border);padding:0 4px;border-radius:3px;font-size:10px">/</kbd> 聚焦</div>
-      </div>
-    </div>
-
-    <!-- Plan sidebar -->
-    <div id="sidebar">
-      <div class="sb-hdr">
-        <span>📚 Learning Plan</span>
-        <button class="btn-icon" onclick="togglePlan()" style="width:22px;height:22px;font-size:11px">✕</button>
-      </div>
-      <div id="plan-wrap">
-        <div class="plan-empty">No plan yet.<br>Start chatting and your<br>learning plan will appear here.</div>
       </div>
     </div>
 
@@ -476,9 +439,8 @@ async def chat_stream(req: ChatReq):
 
 <script>
 // ─── State ─────────────────────────────────────────────
-let cfg = { url: window.location.origin, sid: genSid() };
+let cfg = { url: window.location.origin, sid: genSid(), course: 'math' };
 let busy = false;
-let planOpen = true;
 let msgCount = 0;
 let authToken = localStorage.getItem('auth_token') || null;
 let authMode = 'login';
@@ -655,7 +617,7 @@ async function tryStream(msg){
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`
       },
-      body: JSON.stringify({ session_id: cfg.sid, message: msg }),
+      body: JSON.stringify({ session_id: cfg.sid, message: msg, course: cfg.course }),
       signal: AbortSignal.timeout(60000),
     });
 
@@ -669,7 +631,6 @@ async function tryStream(msg){
     const dec    = new TextDecoder();
     let buf  = '';
     let text = '';
-    let plan = null;
     let done = false;
 
     while (!done){
@@ -692,8 +653,6 @@ async function tryStream(msg){
             el.innerHTML = esc(text).replace(/\n/g,'<br>') + '<span class="cur"></span>';
             scrollBot();
           }
-          if (ev.type === 'plan' && ev.plan != null) plan = ev.plan;
-          if (ev.type === 'done' && ev.plan)         plan = ev.plan;
         } catch {
           // raw text chunk fallback
           text += raw;
@@ -706,7 +665,6 @@ async function tryStream(msg){
     // Finalize
     el.innerHTML = md(text);
     addCopyBtn(el, text);
-    if (plan != null) renderPlan(plan);
     setStatus('Ready');
     scrollBot();
     return true;
@@ -800,40 +758,6 @@ function setStatus(txt, type=''){
 
 function setMode(txt){ document.getElementById('mode-lbl').textContent = txt; }
 
-// ─── Plan rendering ─────────────────────────────────────
-function renderPlan(plan){
-  const pw = document.getElementById('plan-wrap');
-  pw.innerHTML = '';
-
-  const entries = flattenPlan(plan);
-  if (!entries.length){
-    pw.innerHTML = '<div class="plan-empty">Plan received but is empty.</div>';
-    return;
-  }
-  entries.forEach(([k,v]) => {
-    const card = document.createElement('div');
-    card.className = 'pcard';
-    card.innerHTML = `<div class="pcard-key">${esc(k)}</div><div class="pcard-val">${esc(v)}</div>`;
-    pw.appendChild(card);
-  });
-
-  // Auto-open sidebar if it was closed
-  if (!planOpen) togglePlan();
-}
-
-function flattenPlan(plan, prefix=''){
-  if (typeof plan === 'string') return [[ prefix || 'plan', plan ]];
-  if (Array.isArray(plan)) return plan.map((v,i) => flattenPlan(v, `${prefix || 'step'} ${i+1}`)).flat();
-  if (plan && typeof plan === 'object'){
-    return Object.entries(plan).map(([k,v]) => {
-      const key = prefix ? `${prefix} › ${k}` : k;
-      if (v && typeof v === 'object') return flattenPlan(v, key);
-      return [[ key, String(v) ]];
-    }).flat();
-  }
-  return [[ prefix || 'plan', String(plan) ]];
-}
-
 // ─── Utils ───────────────────────────────────────────────
 function md(t){ try { return marked.parse(t||'') } catch{ return esc(t) } }
 function esc(s){
@@ -853,9 +777,10 @@ function refreshSessLabel(){
 }
 
 // ─── UI actions ──────────────────────────────────────────
-function togglePlan(){
-  planOpen = !planOpen;
-  document.getElementById('sidebar').classList.toggle('off', !planOpen);
+function switchCourse(){
+  cfg.course = document.getElementById('course-sel').value;
+  newSession();
+  toast('Switched to ' + cfg.course);
 }
 
 function newSession(){
@@ -872,8 +797,6 @@ function clearChat(){
       <h3>Start a conversation</h3>
       <p>Your AI teacher is ready.<br>Ask anything to begin.</p>
     </div>`;
-  document.getElementById('plan-wrap').innerHTML =
-    '<div class="plan-empty">No plan yet.<br>Start chatting and your<br>learning plan will appear here.</div>';
   setMode('Mode: Auto-detect');
 }
 

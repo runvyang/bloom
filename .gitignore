@@ -3,6 +3,6 @@ data/history/*
 data/student/*
 data/auth.db
 data/student/*/sessions/*
-data/student/*/student_state.md
+data/student/*/*_state.md
 __pycache__/
 *.pyc

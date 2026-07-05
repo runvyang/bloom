@@ -60,7 +60,7 @@ class ChatRuntime:
     def __init__(self):
         pass
 
-    def _prepare_context(self, session_id: str, user_input: str, user_id: str, log=True) -> dict:
+    def _prepare_context(self, session_id: str, user_input: str, user_id: str, course: str, log=True) -> dict:
         """
         准备所有上下文数据
         
@@ -79,13 +79,14 @@ class ChatRuntime:
         related_sessions = "\n".join([m['memory'] for m in mem_context["results"]])
         
         # 3. static files
-        student_state_path = f"data/student/{user_id}/student_state.md"
+        student_state_path = f"data/student/{user_id}/{course}_state.md"
+        template_path = f"courses/{course}/student_state.md"
         if not os.path.exists(student_state_path):
-            copy_file("data/student_state.md", student_state_path)
+            copy_file(template_path, student_state_path)
         student_state = read_file(student_state_path)
-        world_model = read_file("courses/math/world_model.md")
-        plan = read_file("courses/math/planner.md")
-        teacher_prompt = read_file("courses/math/teacher_prompt.md")
+        world_model = read_file(f"courses/{course}/world_model.md")
+        plan = read_file(f"courses/{course}/planner.md")
+        teacher_prompt = read_file(f"courses/{course}/teacher_prompt.md")
         
         return {
             "session": session,
@@ -98,10 +99,10 @@ class ChatRuntime:
         }
 
     # 或者更清晰的方式
-    def teach(self, session_id: str, user_input: str, user_id: str):
+    def teach(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
         """改进版本的chat方法"""
         # 1. 准备上下文
-        context = self._prepare_context(session_id, user_input, user_id)
+        context = self._prepare_context(session_id, user_input, user_id, course)
         full_response = ""
         
         try:
@@ -142,9 +143,9 @@ learning world model:
                 session_manager.append(session_id, "assistant", full_response, user_id)
             self._log(session_id, user_input, full_response, user_id)
 
-    def eval(self, session_id: str, user_input: str, user_id: str):
+    def eval(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
         # 1. 准备上下文
-        context = self._prepare_context(session_id, user_input, user_id, log=False)
+        context = self._prepare_context(session_id, user_input, user_id, course, log=False)
         print("starting eval student status")
         
         response = llm.chat([
@@ -185,14 +186,14 @@ learning world model:
                 for i, d in enumerate(model_update_delta, 1):
                     delta_texts.append(f"{i}. {format_delta(d)}")
                 state_update = "\n\n# DELTA UPDATE\n" + "\n".join(delta_texts)
-                append_file(f"data/student/{user_id}/student_state.md", state_update)
+                append_file(f"data/student/{user_id}/{course}_state.md", state_update)
                 print("receiving state updates: ", state_update)
         except json.JSONDecodeError as e:
             print(f"err decode:\n {response.choices[0].message.content}")
             
 
-    def update_state(self, session_id: str, eval_result: str, user_input: str, user_id: str):
-        context = self._prepare_context(session_id, user_input, user_id, log=False)
+    def update_state(self, session_id: str, eval_result: str, user_input: str, user_id: str, course: str = "math"):
+        context = self._prepare_context(session_id, user_input, user_id, course, log=False)
 
         response = llm.chat([
             {"role": "system", "content": f"""

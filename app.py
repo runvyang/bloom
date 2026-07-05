@@ -92,17 +92,18 @@ def auth_me(authorization: str = Header(None)):
 class ChatReq(BaseModel):
     session_id: str
     message: str
+    course: str = "math"
 
 @app.post("/chat/stream")
 def chat(req: ChatReq, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     user_id = user["username"]
 
     def generate():
-        for chunk in chat_runtime.teach(req.session_id, req.message, user_id):
+        for chunk in chat_runtime.teach(req.session_id, req.message, user_id, req.course):
             yield f"data: {json.dumps(chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
-    background_tasks.add_task(chat_runtime.eval, req.session_id, req.message, user_id)
+    background_tasks.add_task(chat_runtime.eval, req.session_id, req.message, user_id, req.course)
     
     return StreamingResponse(
         generate(),
