@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom Admin</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--surface3:#21223a;
+  --border:#252744;--accent:#6366f1;--accent-hi:#818cf8;--text:#dde0f2;
+  --text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;
+  --mono:"JetBrains Mono","Fira Code",monospace;--sans:system-ui,-apple-system,sans-serif;
+  --r:9px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans)}
+#app{height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+#hdr{height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0}
+.hdr-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.hdr-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.sp{flex:1}
+.btn{padding:6px 12px;border:none;border-radius:var(--r);cursor:pointer;font-size:12px;font-family:var(--sans);transition:all .15s}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+.btn-accent{background:var(--accent);color:#fff}
+.btn-accent:hover{background:var(--accent-hi)}
+#user-info{font-size:11px;color:var(--text3)}
+
+/* Login */
+#login-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:999}
+#login-box{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:28px;width:350px}
+#login-box h2{font-size:16px;margin-bottom:18px}
+#login-err{display:none;background:var(--surface2);border:1px solid var(--red);padding:8px 11px;border-radius:7px;font-size:12px;color:var(--red);margin-bottom:12px}
+.field{margin-bottom:12px}
+.field input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:9px 11px;font-size:14px;outline:none}
+.field input:focus{border-color:var(--accent)}
+
+/* Main */
+#main{display:flex;flex:1;overflow:hidden}
+#sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sb-hdr{padding:12px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+#student-list{flex:1;overflow-y:auto;padding:8px}
+.student-item{padding:10px 12px;cursor:pointer;border-radius:7px;font-size:13px;margin-bottom:2px;transition:all .15s;display:flex;align-items:center;gap:8px}
+.student-item:hover{background:var(--surface2)}
+.student-item.active{background:var(--accent);color:#fff}
+.student-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.student-item.active .student-dot{background:#fff}
+
+#content{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+#content::-webkit-scrollbar{width:4px}
+#content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* Content */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);gap:10px}
+.empty-state .icon{font-size:40px;opacity:.5}
+.tab-bar{display:flex;gap:4px;flex-shrink:0}
+.tab{padding:7px 14px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--text3);border:1px solid var(--border);background:transparent;transition:all .15s}
+.tab:hover{color:var(--text2)}
+.tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tab-count{font-size:10px;color:var(--text3);margin-left:4px}
+.tab.active .tab-count{color:rgba(255,255,255,.6)}
+
+/* State viewer */
+.state-content{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-word;font-family:var(--mono)}
+.state-content h1,.state-content h2,.state-content h3{color:var(--text);margin:16px 0 8px;font-family:var(--sans)}
+.state-content table{border-collapse:collapse;width:100%;margin:8px 0;font-size:11px}
+.state-content td,.state-content th{border:1px solid var(--border);padding:5px 8px;text-align:left}
+.state-content th{background:var(--surface2);color:var(--text);font-weight:600}
+.state-content code{background:var(--surface2);padding:1px 4px;border-radius:3px;font-size:11px}
+.state-content strong{color:var(--accent-hi)}
+
+/* Session viewer */
+.session-list{display:flex;flex-direction:column;gap:4px}
+.session-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;cursor:pointer;font-size:13px;transition:all .15s;display:flex;justify-content:space-between;align-items:center}
+.session-item:hover{background:var(--surface2);border-color:var(--accent)}
+.session-item .sid{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.session-item .meta{font-size:10px;color:var(--text3)}
+.msg-bubble{padding:10px 14px;margin:6px 0;border-radius:var(--r);font-size:13px;line-height:1.6}
+.msg-bubble.user{background:var(--surface2);border-left:3px solid var(--accent)}
+.msg-bubble.assistant{background:var(--surface);border-left:3px solid var(--green)}
+.msg-role{font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:3px}
+.msg-time{font-size:9px;color:var(--text3);float:right}
+
+/* Toast */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;color:var(--text);z-index:9999;pointer-events:none;animation:ti .2s ease}
+@keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hdr">
+    <div class="hdr-title"><div class="hdr-dot"></div>Bloom Admin</div>
+    <span class="sp"></span>
+    <span id="user-info"></span>
+    <button class="btn btn-ghost" onclick="logout()">Logout</button>
+  </header>
+
+  <div id="main">
+    <div id="sidebar">
+      <div class="sb-hdr">Students</div>
+      <div id="student-list"></div>
+    </div>
+    <div id="content">
+      <div class="empty-state">
+        <div class="icon">👈</div>
+        <p style="font-size:14px;color:var(--text2)">Select a student to view their data</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login overlay -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h2>🔐 Admin Login</h2>
+    <div id="login-err"></div>
+    <div class="field">
+      <input id="admin-pass" type="password" placeholder="Admin password" onkeydown="if(event.key==='Enter')adminLogin()">
+    </div>
+    <button class="btn btn-accent" onclick="adminLogin()" style="width:100%">Login</button>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let adminToken = localStorage.getItem('admin_token');
+let currentStudent = null;
+let currentTab = null;
+let stateFiles = [];
+let sessionFiles = [];
+
+// Init
+(function(){
+  if (adminToken) {
+    checkAdmin();
+  }
+})();
+
+async function checkAdmin(){
+  try {
+    const r = await fetch(`${API}/admin/users`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (r.ok) {
+      document.getElementById('login-overlay').style.display = 'none';
+      loadStudents();
+    } else {
+      localStorage.removeItem('admin_token');
+      adminToken = null;
+    }
+  } catch { document.getElementById('login-overlay').style.display = 'flex'; }
+}
+
+async function adminLogin(){
+  const pass = document.getElementById('admin-pass').value;
+  const errEl = document.getElementById('login-err');
+  try {
+    const r = await fetch(`${API}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
+    const d = await r.json();
+    if (!r.ok) { errEl.textContent = d.detail; errEl.style.display = 'block'; return; }
+    adminToken = d.token;
+    localStorage.setItem('admin_token', adminToken);
+    document.getElementById('login-overlay').style.display = 'none';
+    errEl.style.display = 'none';
+    loadStudents();
+  } catch(e) { errEl.textContent = 'Network error'; errEl.style.display = 'block'; }
+}
+
+function logout(){
+  localStorage.removeItem('admin_token');
+  adminToken = null;
+  location.reload();
+}
+
+async function loadStudents(){
+  const r = await fetch(`${API}/admin/users`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const d = await r.json();
+  const list = document.getElementById('student-list');
+  list.innerHTML = d.users.map(u =>
+    `<div class="student-item" onclick="selectStudent('${u}')" id="stu-${u}">
+      <div class="student-dot"></div>${u}
+    </div>`
+  ).join('');
+}
+
+async function selectStudent(username){
+  currentStudent = username;
+  document.querySelectorAll('.student-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('stu-' + username)?.classList.add('active');
+
+  // Load states
+  const sr = await fetch(`${API}/admin/state/${username}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const sd = await sr.json();
+  stateFiles = sd.states;
+
+  // Load sessions
+  const sessR = await fetch(`${API}/admin/sessions/${username}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const sessD = await sessR.json();
+  sessionFiles = sessD.sessions;
+
+  renderTabs();
+}
+
+function renderTabs(){
+  const content = document.getElementById('content');
+  let html = '<div class="tab-bar">';
+
+  // State tabs
+  stateFiles.forEach(s => {
+    html += `<button class="tab" onclick="showState('${s.course}')">
+      📄 ${s.course}_state
+    </button>`;
+  });
+
+  // Session tab
+  html += `<button class="tab" onclick="showSessions()">
+    💬 Sessions <span class="tab-count">${sessionFiles.length}</span>
+  </button>`;
+
+  html += '</div><div id="detail-area"></div>';
+  content.innerHTML = html;
+
+  // Auto-select first state
+  if (stateFiles.length > 0) showState(stateFiles[0].course);
+  else showSessions();
+}
+
+async function showState(course){
+  currentTab = course;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  // Find the matching tab button
+  Array.from(document.querySelectorAll('.tab')).forEach(t => {
+    if (t.textContent.trim().startsWith('📄 ' + course)) t.classList.add('active');
+  });
+
+  const r = await fetch(`${API}/admin/state/${currentStudent}/${course}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const d = await r.json();
+  document.getElementById('detail-area').innerHTML =
+    `<div class="state-content">${simpleMd(d.content)}</div>`;
+}
+
+function showSessions(){
+  currentTab = 'sessions';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  Array.from(document.querySelectorAll('.tab')).forEach(t => {
+    if (t.textContent.includes('Sessions')) t.classList.add('active');
+  });
+
+  if (sessionFiles.length === 0) {
+    document.getElementById('detail-area').innerHTML =
+      '<div class="empty-state"><p style="color:var(--text3)">No sessions yet</p></div>';
+    return;
+  }
+
+  const html = '<div class="session-list">' + sessionFiles.map(s => `
+    <div class="session-item" onclick="showSession('${s.session_id}')">
+      <div>
+        <div class="sid">${s.session_id.slice(0,24)}…</div>
+        <div class="meta">${s.modified} · ${(s.size/1024).toFixed(1)} KB</div>
+      </div>
+      <span style="color:var(--text3);font-size:11px">→</span>
+    </div>
+  `).join('') + '</div>';
+
+  document.getElementById('detail-area').innerHTML = html;
+}
+
+async function showSession(sessionId){
+  const r = await fetch(`${API}/admin/session/${currentStudent}/${sessionId}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const d = await r.json();
+  const s = d.session;
+
+  let html = `<button class="btn btn-ghost" onclick="showSessions()" style="margin-bottom:12px">← Back to sessions</button>`;
+  html += `<div style="font-size:11px;color:var(--text3);margin-bottom:12px;font-family:var(--mono)">${sessionId}</div>`;
+
+  if (s.messages) {
+    s.messages.forEach(m => {
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      html += `<div class="msg-bubble ${role}">
+        <div class="msg-role">${m.role} <span class="msg-time">${m.time || ''}</span></div>
+        ${esc(m.content)}
+      </div>`;
+    });
+  }
+  if (s.current_plan) {
+    html += `<div class="msg-bubble" style="border-left:3px solid var(--yellow)">
+      <div class="msg-role">📋 Plan</div>${esc(s.current_plan)}
+    </div>`;
+  }
+
+  document.getElementById('detail-area').innerHTML = html;
+}
+
+// Simple markdown-like rendering
+function simpleMd(text){
+  return esc(text)
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\|(.+)\|/g, (m) => {
+      const cells = m.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+      return `<tr>${cells}</tr>`;
+    })
+    .replace(/(<tr>.*<\/tr>\n?)+/g, '<table>$&</table>')
+    .replace(/^- (.+)$/gm, '• $1')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>

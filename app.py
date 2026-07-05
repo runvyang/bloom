@@ -5,6 +5,8 @@ from fastapi import BackgroundTasks
 from pydantic import BaseModel
 from runtime import ChatRuntime
 from auth import init_db, register_user, authenticate_user, validate_session, invalidate_session
+from auth import admin_login, validate_admin, admin_logout, list_users
+from auth import get_user_states, get_user_state_content, list_user_sessions, get_user_session_content
 import json
 import os
 
@@ -30,6 +32,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def root():
     """返回前端UI页面"""
     return FileResponse("static/index.html")
+
+@app.get("/admin")
+def admin_page():
+    """返回Admin管理页面"""
+    return FileResponse("static/admin.html")
 
 # =========================
 # Auth dependency
@@ -85,6 +92,111 @@ def auth_me(authorization: str = Header(None)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return {"success": True, "user": user}
+
+# =========================
+# ADMIN API
+# =========================
+class AdminLoginReq(BaseModel):
+    password: str
+
+@app.post("/admin/login")
+def admin_login_route(req: AdminLoginReq):
+    result = admin_login(req.password)
+    if not result["success"]:
+        raise HTTPException(status_code=401, detail=result["error"])
+    return result
+
+def get_admin(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+    token = authorization.split(" ", 1)[1]
+    if not validate_admin(token):
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+    return True
+
+@app.get("/admin/users")
+def admin_list_users(admin: bool = Depends(get_admin)):
+    return {"users": list_users()}
+
+@app.get("/admin/state/{username}")
+def admin_get_states(username: str, admin: bool = Depends(get_admin)):
+    return {"states": get_user_states(username)}
+
+@app.get("/admin/state/{username}/{course}")
+def admin_get_state_content(username: str, course: str, admin: bool = Depends(get_admin)):
+    content = get_user_state_content(username, course)
+    if content is None:
+        raise HTTPException(status_code=404, detail="State file not found")
+    return {"content": content, "course": course, "username": username}
+
+@app.get("/admin/sessions/{username}")
+def admin_list_user_sessions(username: str, admin: bool = Depends(get_admin)):
+    return {"sessions": list_user_sessions(username)}
+
+@app.get("/admin/session/{username}/{session_id}")
+def admin_get_session(username: str, session_id: str, admin: bool = Depends(get_admin)):
+    content = get_user_session_content(username, session_id)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"session": content, "username": username}
+
+# =========================
+# TASK & CALENDAR API
+# =========================
+from storage import (generate_daily_tasks, get_daily_tasks, start_task,
+                     complete_task, update_task_elapsed, get_streak_info,
+                     get_calendar, get_daily_detail, get_recent_records)
+
+class TaskStartReq(BaseModel):
+    course: str
+    session_id: str = ""
+
+class TaskUpdateReq(BaseModel):
+    course: str
+    elapsed: int = 0
+
+@app.get("/tasks/today")
+def api_daily_tasks(user: dict = Depends(get_current_user)):
+    tasks = generate_daily_tasks(user["username"])
+    streak = get_streak_info(user["username"])
+    return {"tasks": tasks, "streak": streak}
+
+@app.post("/tasks/start")
+def api_start_task(req: TaskStartReq, user: dict = Depends(get_current_user)):
+    tasks = start_task(user["username"], req.course, req.session_id)
+    return {"tasks": tasks}
+
+@app.post("/tasks/elapsed")
+def api_update_elapsed(req: TaskUpdateReq, user: dict = Depends(get_current_user)):
+    update_task_elapsed(user["username"], req.course, req.elapsed)
+    return {"ok": True}
+
+@app.post("/tasks/complete")
+def api_complete_task(req: TaskStartReq, user: dict = Depends(get_current_user)):
+    tasks = complete_task(user["username"], req.course)
+    return {"tasks": tasks}
+
+@app.get("/tasks/streak")
+def api_streak(user: dict = Depends(get_current_user)):
+    return get_streak_info(user["username"])
+
+@app.get("/tasks/calendar")
+def api_calendar(year: int = 0, month: int = 0, user: dict = Depends(get_current_user)):
+    from datetime import date
+    if not year:
+        year = date.today().year
+    if not month:
+        month = date.today().month
+    return {"days": get_calendar(user["username"], year, month), "year": year, "month": month}
+
+@app.get("/tasks/detail/{target_date}")
+def api_daily_detail(target_date: str, user: dict = Depends(get_current_user)):
+    return get_daily_detail(user["username"], target_date)
+
+@app.get("/tasks/records")
+def api_records(course: str = "", user: dict = Depends(get_current_user)):
+    records = get_recent_records(user["username"], course if course else None, limit=20)
+    return {"records": records}
 
 # =========================
 # CHAT API（实时教学）

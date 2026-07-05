@@ -4,5 +4,6 @@ data/student/*
 data/auth.db
 data/student/*/sessions/*
 data/student/*/*_state.md
+data/learning.db
 __pycache__/
 *.pyc

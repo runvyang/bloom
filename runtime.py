@@ -2,6 +2,7 @@ from llm import OpenRouterClient
 from session_manager import SessionManager
 from memory import MemoryManager
 from utils import read_file, append_file, copy_file
+from storage import save_learning_record, extract_knowledge_points, init_storage
 from datetime import datetime
 import json
 import os
@@ -10,8 +11,8 @@ from fastapi import BackgroundTasks
 llm = OpenRouterClient()
 session_manager = SessionManager()
 memory = MemoryManager()
+init_storage()
 
-import json
 from typing import List, Dict
 
 
@@ -188,6 +189,14 @@ learning world model:
                 state_update = "\n\n# DELTA UPDATE\n" + "\n".join(delta_texts)
                 append_file(f"data/student/{user_id}/{course}_state.md", state_update)
                 print("receiving state updates: ", state_update)
+            # Save to learning storage
+            try:
+                kps = extract_knowledge_points(eval_result)
+                save_learning_record(user_id, course, session_id,
+                                     eval_result.get('teaching_plan'),
+                                     eval_result, kps)
+            except Exception as e:
+                print(f"storage save err: {e}")
         except json.JSONDecodeError as e:
             print(f"err decode:\n {response.choices[0].message.content}")
             

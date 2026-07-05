@@ -184,14 +184,108 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 #send-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
 .inp-hint{font-size:11px;color:var(--text3);margin-top:6px;padding-left:2px}
 
-/* ─── Course selector ─────────────────────────────────── */
-#course-sel{
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:7px;color:var(--text);padding:5px 8px;
-  font-size:12px;font-family:var(--sans);outline:none;
-  cursor:pointer;margin-right:6px;
+/* ─── Right panel (daily tasks) ──────────────────────── */
+#right-panel{
+  width:280px;border-left:1px solid var(--border);
+  background:var(--surface);display:flex;flex-direction:column;
+  overflow:hidden;flex-shrink:0;transition:width .25s ease;
 }
-#course-sel:focus{border-color:var(--accent)}
+#right-panel.off{width:0}
+.rp-inner{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.rp-inner::-webkit-scrollbar{width:3px}
+.rp-inner::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* Streak badge */
+.streak-badge{
+  background:linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  border-radius:11px;padding:12px;color:#fff;text-align:center;
+}
+.streak-flame{font-size:24px}
+.streak-num{font-size:28px;font-weight:800;line-height:1}
+.streak-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;opacity:.8;margin-top:2px}
+.streak-today{font-size:10px;opacity:.8;margin-top:4px}
+
+/* Task card */
+.task-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;transition:all .2s;
+}
+.task-card.active{border-color:var(--accent);box-shadow:0 0 12px rgba(99,102,241,.15)}
+.task-card.done{border-color:var(--green);opacity:.85}
+.task-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.task-course{font-size:13px;font-weight:600}
+.task-order{font-size:10px;color:var(--text3)}
+.task-status{
+  font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;
+}
+.task-status.pending{background:var(--surface3);color:var(--text2)}
+.task-status.active{background:rgba(99,102,241,.2);color:var(--accent-hi)}
+.task-status.done{background:rgba(74,222,128,.15);color:var(--green)}
+
+/* Timer */
+.timer-display{
+  font-family:var(--mono);font-size:32px;font-weight:700;
+  text-align:center;padding:8px 0;color:var(--text);
+  letter-spacing:2px;
+}
+.timer-display.warning{color:var(--yellow)}
+.timer-display.done{color:var(--green)}
+.timer-bar{
+  height:3px;background:var(--surface3);border-radius:2px;margin:6px 0;overflow:hidden;
+}
+.timer-bar-fill{
+  height:100%;background:var(--accent);border-radius:2px;transition:width 1s linear;
+}
+.timer-bar-fill.warning{background:var(--yellow)}
+.timer-bar-fill.done{background:var(--green)}
+
+.task-btn{
+  width:100%;padding:8px;border:none;border-radius:7px;cursor:pointer;
+  font-size:12px;font-weight:600;font-family:var(--sans);transition:all .15s;
+}
+.task-btn.start{background:var(--accent);color:#fff}
+.task-btn.start:hover{background:var(--accent-hi)}
+.task-btn.done-btn{background:rgba(74,222,128,.15);color:var(--green);cursor:default}
+.task-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Calendar button */
+.cal-btn{
+  width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;
+  background:transparent;color:var(--text2);cursor:pointer;
+  font-size:12px;font-family:var(--sans);transition:all .15s;
+}
+.cal-btn:hover{background:var(--surface2);color:var(--text)}
+
+/* Calendar modal */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal-day-hdr{font-size:10px;color:var(--text3);padding:4px 0;font-weight:600}
+.cal-cell{
+  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;border-radius:5px;font-size:12px;cursor:pointer;
+  position:relative;transition:all .15s;
+}
+.cal-cell:hover{background:var(--surface2)}
+.cal-cell.today{border:1px solid var(--accent)}
+.cal-cell.has-data{background:rgba(99,102,241,.1)}
+.cal-dot{width:5px;height:5px;border-radius:50%;margin-top:1px}
+.cal-dot.good{background:var(--green)}
+.cal-dot.partial{background:var(--yellow)}
+
+/* Celebration */
+.celebrate{
+  position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  z-index:9999;pointer-events:none;animation:celebrate-in .3s ease;
+}
+.celebrate-box{
+  background:var(--surface);border:2px solid var(--green);border-radius:16px;
+  padding:24px 36px;text-align:center;box-shadow:0 0 40px rgba(74,222,128,.2);
+}
+.celebrate-icon{font-size:48px;margin-bottom:8px}
+.celebrate-text{font-size:16px;font-weight:700;color:var(--green);margin-bottom:4px}
+.celebrate-sub{font-size:12px;color:var(--text2)}
+@keyframes celebrate-in{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+
+@media(max-width:900px){#right-panel{display:none}}
 
 /* ─── Status bar ──────────────────────────────────────── */
 #sbar{
@@ -328,6 +422,35 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       </div>
     </div>
 
+    <!-- Right panel: daily tasks -->
+    <div id="right-panel">
+      <div class="rp-inner" id="rp-inner">
+        <div id="streak-area"></div>
+        <div id="tasks-area">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 Today's Tasks</div>
+          <div id="task-list" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+        <button class="cal-btn" onclick="openCalendar()">📅 Learning Calendar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Calendar Modal -->
+  <div class="overlay" id="cal-modal" style="display:none" onclick="if(event.target===this)closeCalendar()">
+    <div class="modal" style="width:400px">
+      <div class="modal-title" id="cal-title">📅 Learning Calendar</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <button class="btn-ghost" onclick="calPrevMonth()" style="font-size:16px">←</button>
+        <span id="cal-month-label" style="font-size:14px;font-weight:600"></span>
+        <button class="btn-ghost" onclick="calNextMonth()" style="font-size:16px">→</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div id="cal-day-detail" style="margin-top:12px;font-size:12px;color:var(--text2)"></div>
+      <div class="modal-foot">
+        <button class="btn-ghost" onclick="closeCalendar()">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Status bar -->
@@ -489,6 +612,7 @@ function checkAuth() {
         document.getElementById('user-label').textContent = username;
         document.getElementById('logout-btn').style.display = '';
         setStatus('Ready');
+        loadTasks();
       } else {
         localStorage.removeItem('auth_token');
         authToken = null;
@@ -556,6 +680,7 @@ async function submitAuth() {
     document.getElementById('user-label').textContent = username;
     document.getElementById('logout-btn').style.display = '';
     toast('Welcome, ' + username + '!');
+    loadTasks();
 
   } catch (err) {
     errEl.textContent = 'Network error: ' + err.message;
@@ -580,6 +705,228 @@ function logout() {
   showAuthModal();
 }
 
+// ─── Tasks & Timer ─────────────────────────────────────
+let timers = {};  // course -> intervalId
+let calendarYear, calendarMonth;
+
+function loadTasks(){
+  fetch(`${cfg.url}/tasks/today`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(d => renderTasks(d.tasks, d.streak))
+  .catch(() => {});
+}
+
+function renderTasks(tasks, streak){
+  // Streak
+  document.getElementById('streak-area').innerHTML = `
+    <div class="streak-badge">
+      <div class="streak-flame">🔥</div>
+      <div class="streak-num">${streak.streak}</div>
+      <div class="streak-label">Day Streak</div>
+      <div class="streak-today">Today: ${streak.today_courses}/2 courses · ${streak.today_minutes}min</div>
+    </div>`;
+
+  // Tasks
+  const tl = document.getElementById('task-list');
+  if (!tasks || !tasks.length) {
+    tl.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:12px">No tasks yet.<br>Start a chat to begin!</div>';
+    return;
+  }
+  tl.innerHTML = tasks.map(t => {
+    const isActive = t.status === 'in_progress';
+    const isDone = t.status === 'completed';
+    const elapsed = t.elapsed_seconds || 0;
+    const remaining = Math.max(0, (t.duration_seconds || 2400) - elapsed);
+    const min = Math.floor(remaining / 60);
+    const sec = remaining % 60;
+    const pct = ((elapsed / (t.duration_seconds || 2400)) * 100).toFixed(1);
+
+    return `<div class="task-card ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" id="task-${t.course}">
+      <div class="task-header">
+        <span class="task-course">${courseEmoji(t.course)} ${t.course}</span>
+        <span class="task-order">Task ${t.task_order}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="task-status ${isDone ? 'done' : isActive ? 'active' : 'pending'}">${isDone ? '✓ Done' : isActive ? '● Active' : 'Pending'}</span>
+        <span style="font-size:10px;color:var(--text3)">40 min</span>
+      </div>
+      <div class="timer-display${isActive && remaining < 300 ? ' warning' : ''}${isDone ? ' done' : ''}" id="timer-${t.course}">
+        ${isDone ? '40:00' : String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0')}
+      </div>
+      <div class="timer-bar"><div class="timer-bar-fill${isDone ? ' done' : isActive && remaining < 300 ? ' warning' : ''}" style="width:${pct}%" id="bar-${t.course}"></div></div>
+      ${isDone ? '<button class="task-btn done-btn" disabled>✅ Completed — Great job!</button>' :
+        isActive ? `<button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer">Complete Now</button>` :
+        `<button class="task-btn start" onclick="startCourseTask('${t.course}')">▶ Start Learning</button>`}
+    </div>`;
+  }).join('');
+
+  // Start timers for active tasks
+  tasks.forEach(t => {
+    if (t.status === 'in_progress' && !timers[t.course]) {
+      startTimer(t.course, t.elapsed_seconds || 0, t.duration_seconds || 2400);
+    }
+  });
+}
+
+function courseEmoji(c){
+  return {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[c] || '📝';
+}
+
+function startTimer(course, elapsed, duration){
+  let remaining = duration - elapsed;
+  const updateDisplay = () => {
+    const min = Math.floor(Math.max(0, remaining) / 60);
+    const sec = Math.max(0, remaining) % 60;
+    const el = document.getElementById('timer-' + course);
+    const bar = document.getElementById('bar-' + course);
+    if (el) {
+      el.textContent = String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+      el.className = 'timer-display' + (remaining < 300 ? ' warning' : '') + (remaining <= 0 ? ' done' : '');
+    }
+    if (bar) {
+      const pct = ((elapsed / duration) * 100).toFixed(1);
+      bar.style.width = pct + '%';
+      bar.className = 'timer-bar-fill' + (remaining < 300 ? ' warning' : '') + (remaining <= 0 ? ' done' : '');
+    }
+  };
+
+  timers[course] = setInterval(() => {
+    remaining--;
+    elapsed++;
+    updateDisplay();
+    // Sync elapsed to server every 30s
+    if (elapsed % 30 === 0) {
+      fetch(`${cfg.url}/tasks/elapsed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ course, elapsed })
+      }).catch(() => {});
+    }
+    // Auto-complete at 0
+    if (remaining <= 0) {
+      clearInterval(timers[course]);
+      delete timers[course];
+      completeCourseTask(course);
+    }
+  }, 1000);
+  updateDisplay();
+}
+
+async function startCourseTask(course){
+  await fetch(`${cfg.url}/tasks/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+    body: JSON.stringify({ course, session_id: cfg.sid })
+  });
+  // Switch course selector
+  document.getElementById('course-sel').value = course;
+  cfg.course = course;
+  loadTasks();
+}
+
+async function completeCourseTask(course){
+  if (timers[course]) { clearInterval(timers[course]); delete timers[course]; }
+  const r = await fetch(`${cfg.url}/tasks/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+    body: JSON.stringify({ course })
+  });
+  const d = await r.json();
+  renderTasks(d.tasks);
+  celebrate(course);
+}
+
+function celebrate(course){
+  const ov = document.createElement('div');
+  ov.className = 'celebrate';
+  ov.innerHTML = `<div class="celebrate-box">
+    <div class="celebrate-icon">🎉</div>
+    <div class="celebrate-text">${courseEmoji(course)} ${course} Complete!</div>
+    <div class="celebrate-sub">You've finished 40 minutes of focused learning.<br>Ready for the next course? Keep going! 💪</div>
+  </div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => { ov.style.opacity='0'; ov.style.transition='opacity .5s'; }, 2500);
+  setTimeout(() => ov.remove(), 3100);
+}
+
+// ─── Calendar ───────────────────────────────────────────
+function openCalendar(){
+  const now = new Date();
+  calendarYear = now.getFullYear();
+  calendarMonth = now.getMonth() + 1;
+  document.getElementById('cal-modal').style.display = 'flex';
+  renderCalendar();
+}
+
+function closeCalendar(){
+  document.getElementById('cal-modal').style.display = 'none';
+}
+
+function calPrevMonth(){
+  calendarMonth--; if(calendarMonth<1){calendarMonth=12;calendarYear--;}
+  renderCalendar();
+}
+
+function calNextMonth(){
+  calendarMonth++; if(calendarMonth>12){calendarMonth=1;calendarYear++;}
+  renderCalendar();
+}
+
+function renderCalendar(){
+  document.getElementById('cal-month-label').textContent = `${calendarYear} / ${String(calendarMonth).padStart(2,'0')}`;
+
+  fetch(`${cfg.url}/tasks/calendar?year=${calendarYear}&month=${calendarMonth}`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(d => {
+    const today = new Date().toISOString().slice(0,10);
+    const dayData = {};
+    d.days.forEach(dd => { dayData[dd.date] = dd; });
+
+    const firstDay = new Date(calendarYear, calendarMonth - 1, 1).getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+    const hdrs = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    let html = hdrs.map(h => `<div class="cal-day-hdr">${h}</div>`).join('');
+    for (let i = 0; i < firstDay; i++) html += '<div></div>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${calendarYear}-${String(calendarMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dd = dayData[ds];
+      const isToday = ds === today;
+      let cls = 'cal-cell';
+      if (isToday) cls += ' today';
+      if (dd) cls += ' has-data';
+      let dot = '';
+      if (dd) {
+        const dotCls = dd.courses_completed >= 2 ? 'good' : 'partial';
+        dot = `<div class="cal-dot ${dotCls}"></div>`;
+      }
+      html += `<div class="${cls}" onclick="showDayDetail('${ds}')">${d}${dot}</div>`;
+    }
+    document.getElementById('cal-grid').innerHTML = html;
+    document.getElementById('cal-day-detail').innerHTML = '';
+  });
+}
+
+async function showDayDetail(ds){
+  const r = await fetch(`${cfg.url}/tasks/detail/${ds}`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  });
+  const d = await r.json();
+  let html = `<div style="font-weight:600;margin-bottom:6px">${ds}</div>`;
+  if (d.tasks && d.tasks.length) {
+    d.tasks.forEach(t => {
+      html += `<div style="padding:4px 0;font-size:11px">${courseEmoji(t.course)} ${t.course}: <span style="color:${t.status==='completed'?'var(--green)':'var(--text3)'}">${t.status}</span></div>`;
+    });
+  } else {
+    html += '<div style="color:var(--text3)">No learning activity</div>';
+  }
+  document.getElementById('cal-day-detail').innerHTML = html;
+}
+
 // ─── Core: send ─────────────────────────────────────────
 async function sendMsg(){
   const ta = document.getElementById('ta');
@@ -602,6 +949,8 @@ async function sendMsg(){
   busy = false;
   setLoading(false);
   ta.focus();
+  // Refresh tasks after sending
+  setTimeout(loadTasks, 2000);
 }
 
 // ─── SSE streaming ──────────────────────────────────────

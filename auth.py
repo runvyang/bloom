@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import bcrypt
 
 DB_PATH = "data/auth.db"
+ADMIN_PASSWORD_HASH = bcrypt.hashpw(os.getenv("ADMIN_PASSWORD", "admin123").encode(), bcrypt.gensalt()).decode()
+_admin_tokens = set()  # in-memory admin session tokens
 
 
 def get_connection():
@@ -146,3 +148,89 @@ def cleanup_expired_sessions() -> int:
     conn.commit()
     conn.close()
     return count
+
+
+def admin_login(password: str) -> dict:
+    """Admin login with shared password. Returns token on success."""
+    if bcrypt.checkpw(password.encode(), ADMIN_PASSWORD_HASH.encode()):
+        token = str(uuid.uuid4())
+        _admin_tokens.add(token)
+        return {"success": True, "token": token}
+    return {"success": False, "error": "Invalid admin password"}
+
+
+def validate_admin(token: str) -> bool:
+    return token in _admin_tokens
+
+
+def admin_logout(token: str):
+    _admin_tokens.discard(token)
+
+
+def list_users() -> list:
+    """List all users who have data directories."""
+    users = set()
+    student_dir = "data/student"
+    if os.path.exists(student_dir):
+        for name in os.listdir(student_dir):
+            if os.path.isdir(os.path.join(student_dir, name)):
+                users.add(name)
+    # Also check users table in auth.db
+    conn = get_connection()
+    for row in conn.execute("SELECT username FROM users ORDER BY username").fetchall():
+        users.add(row["username"])
+    conn.close()
+    return sorted(users)
+
+
+def get_user_states(username: str) -> list:
+    """List state files for a user."""
+    states = []
+    student_dir = f"data/student/{username}"
+    if os.path.exists(student_dir):
+        for f in sorted(os.listdir(student_dir)):
+            if f.endswith("_state.md"):
+                course = f.replace("_state.md", "")
+                filepath = os.path.join(student_dir, f)
+                states.append({
+                    "course": course,
+                    "file": f,
+                    "size": os.path.getsize(filepath),
+                    "modified": datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
+                })
+    return states
+
+
+def get_user_state_content(username: str, course: str):
+    """Read a specific state file for a user."""
+    path = f"data/student/{username}/{course}_state.md"
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    return None
+
+
+def list_user_sessions(username: str) -> list:
+    """List session files for a user."""
+    sessions = []
+    session_dir = f"data/student/{username}/sessions"
+    if os.path.exists(session_dir):
+        for f in sorted(os.listdir(session_dir), reverse=True):
+            if f.endswith(".json"):
+                filepath = os.path.join(session_dir, f)
+                sessions.append({
+                    "session_id": f.replace(".json", ""),
+                    "size": os.path.getsize(filepath),
+                    "modified": datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
+                })
+    return sessions
+
+
+def get_user_session_content(username: str, session_id: str):
+    """Read a specific session file for a user."""
+    path = f"data/student/{username}/sessions/{session_id}.json"
+    if os.path.exists(path):
+        import json
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
