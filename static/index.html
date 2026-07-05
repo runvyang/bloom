@@ -5,9 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>AI Teacher Chat</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
 /* ─── Reset ─────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ─── KaTeX dark mode ────────────────────────────────── */
+.katex{color:var(--text)}
+.katex-display>.katex{color:var(--text)}
 
 /* ─── Tokens ─────────────────────────────────────────── */
 :root{
@@ -1155,7 +1162,26 @@ function setStatus(txt, type=''){
 function setMode(txt){ document.getElementById('mode-lbl').textContent = txt; }
 
 // ─── Utils ───────────────────────────────────────────────
-function md(t){ try { return marked.parse(t||'') } catch{ return esc(t) } }
+function md(t){
+  let html;
+  try { html = marked.parse(t||''); } catch { return esc(t); }
+  // Render LaTeX math with KaTeX
+  try {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    renderMathInElement(div, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+      ],
+      throwOnError: false
+    });
+    html = div.innerHTML;
+  } catch(e) { /* keep html as-is */ }
+  return html;
+}
 function esc(s){
   return String(s||'')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
