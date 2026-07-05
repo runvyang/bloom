@@ -319,6 +319,8 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <button class="btn-icon" onclick="togglePlan()" title="Toggle plan panel">📋</button>
       <button class="btn-icon" onclick="newSession()" title="New session">↺</button>
       <button class="btn-icon" onclick="clearChat()" title="Clear messages">🗑</button>
+      <span id="user-label" style="font-size:12px;color:var(--text2);margin-right:2px"></span>
+      <button class="btn-ghost" onclick="logout()" style="font-size:11px;padding:3px 8px;display:none" id="logout-btn">Logout</button>
       <button class="btn-sm" onclick="openSettings()">Settings</button>
     </div>
   </header>
@@ -374,6 +376,26 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
     <span id="mode-lbl">Mode: Auto-detect</span>
   </div>
 
+</div>
+
+<!-- Auth Modal -->
+<div class="overlay" id="auth-modal">
+  <div class="modal" style="width:380px">
+    <div class="modal-title" id="auth-title">Login</div>
+    <div id="auth-err" style="display:none;background:var(--surface2);border:1px solid var(--red);border-radius:7px;padding:9px 11px;font-size:12px;color:var(--red);margin-bottom:14px"></div>
+    <div class="field">
+      <label>Username</label>
+      <input id="auth-user" type="text" placeholder="Enter username" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input id="auth-pass" type="password" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <div class="modal-foot" style="justify-content:space-between">
+      <button class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthMode()">Register instead</button>
+      <button class="btn-sm" id="auth-submit-btn" onclick="submitAuth()">Login</button>
+    </div>
+  </div>
 </div>
 
 <!-- Settings modal -->
@@ -458,12 +480,19 @@ let cfg = { url: window.location.origin, sid: genSid() };
 let busy = false;
 let planOpen = true;
 let msgCount = 0;
+let authToken = localStorage.getItem('auth_token') || null;
+let authMode = 'login';
+let username = '';
 
 // ─── Init ───────────────────────────────────────────────
 marked.use({ gfm: true, breaks: true });
 
 (function init(){
   document.getElementById('srv-lbl').textContent = cfg.url;
+  document.getElementById('auth-pass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitAuth(); }
+  });
+  checkAuth();
   refreshSessLabel();
   const ta = document.getElementById('ta');
 
@@ -482,6 +511,111 @@ marked.use({ gfm: true, breaks: true });
     }
   });
 })();
+
+// ─── Auth ───────────────────────────────────────────────
+function checkAuth() {
+  if (authToken) {
+    fetch(`${cfg.url}/auth/me`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        username = data.user.username;
+        document.getElementById('auth-modal').style.display = 'none';
+        document.getElementById('user-label').textContent = username;
+        document.getElementById('logout-btn').style.display = '';
+        setStatus('Ready');
+      } else {
+        localStorage.removeItem('auth_token');
+        authToken = null;
+        showAuthModal();
+      }
+    })
+    .catch(() => showAuthModal());
+  } else {
+    showAuthModal();
+  }
+}
+
+function showAuthModal() {
+  document.getElementById('auth-modal').style.display = 'flex';
+  document.getElementById('auth-title').textContent = 'Login';
+  document.getElementById('auth-submit-btn').textContent = 'Login';
+  document.getElementById('auth-toggle-btn').textContent = 'Register instead';
+  document.getElementById('auth-err').style.display = 'none';
+  authMode = 'login';
+}
+
+function toggleAuthMode() {
+  authMode = (authMode === 'login') ? 'register' : 'login';
+  document.getElementById('auth-title').textContent =
+    authMode === 'login' ? 'Login' : 'Register';
+  document.getElementById('auth-submit-btn').textContent =
+    authMode === 'login' ? 'Login' : 'Create Account';
+  document.getElementById('auth-toggle-btn').textContent =
+    authMode === 'login' ? 'Register instead' : 'Login instead';
+  document.getElementById('auth-err').style.display = 'none';
+}
+
+async function submitAuth() {
+  const u = document.getElementById('auth-user').value.trim();
+  const p = document.getElementById('auth-pass').value;
+  const errEl = document.getElementById('auth-err');
+
+  if (!u || !p) {
+    errEl.textContent = 'Please fill in both fields';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
+
+  try {
+    const resp = await fetch(`${cfg.url}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      errEl.textContent = data.detail || 'Authentication failed';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    authToken = data.token;
+    username = data.user.username;
+    localStorage.setItem('auth_token', authToken);
+    document.getElementById('auth-modal').style.display = 'none';
+    document.getElementById('user-label').textContent = username;
+    document.getElementById('logout-btn').style.display = '';
+    toast('Welcome, ' + username + '!');
+
+  } catch (err) {
+    errEl.textContent = 'Network error: ' + err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function logout() {
+  if (authToken) {
+    fetch(`${cfg.url}/auth/logout`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    }).catch(() => {});
+  }
+  localStorage.removeItem('auth_token');
+  authToken = null;
+  username = '';
+  document.getElementById('user-label').textContent = '';
+  document.getElementById('logout-btn').style.display = 'none';
+  document.getElementById('auth-user').value = '';
+  document.getElementById('auth-pass').value = '';
+  showAuthModal();
+}
 
 // ─── Core: send ─────────────────────────────────────────
 async function sendMsg(){
@@ -517,7 +651,10 @@ async function tryStream(msg){
   try {
     const resp = await fetch(`${cfg.url}/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
       body: JSON.stringify({ session_id: cfg.sid, message: msg }),
       signal: AbortSignal.timeout(60000),
     });

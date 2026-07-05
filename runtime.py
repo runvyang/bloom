@@ -56,10 +56,10 @@ def merge_to_text(json_data: Dict) -> str:
 
 
 class ChatRuntime:
-    def __init__(self, user_id="baozi4"):
-        self.user_id = user_id
+    def __init__(self):
+        pass
 
-    def _prepare_context(self, session_id: str, user_input: str, log=True) -> dict:
+    def _prepare_context(self, session_id: str, user_input: str, user_id: str, log=True) -> dict:
         """
         准备所有上下文数据
         
@@ -73,8 +73,8 @@ class ChatRuntime:
         
         # 2. memory
         if log:
-            memory.add(self.user_id, user_input)
-        mem_context = memory.search(self.user_id, user_input)
+            memory.add(user_id, user_input)
+        mem_context = memory.search(user_id, user_input)
         related_sessions = "\n".join([m['memory'] for m in mem_context["results"]])
         
         # 3. static files
@@ -94,10 +94,10 @@ class ChatRuntime:
         }
 
     # 或者更清晰的方式
-    def teach(self, session_id: str, user_input: str):
+    def teach(self, session_id: str, user_input: str, user_id: str):
         """改进版本的chat方法"""
         # 1. 准备上下文
-        context = self._prepare_context(session_id, user_input)
+        context = self._prepare_context(session_id, user_input, user_id)
         full_response = ""
         
         try:
@@ -136,11 +136,11 @@ learning world model:
         finally:
             if full_response:
                 session_manager.append(session_id, "assistant", full_response)
-            self._log(session_id, user_input, full_response)
+            self._log(session_id, user_input, full_response, user_id)
 
-    def eval(self, session_id: str, user_input: str):
+    def eval(self, session_id: str, user_input: str, user_id: str):
         # 1. 准备上下文
-        context = self._prepare_context(session_id, user_input, log=False)
+        context = self._prepare_context(session_id, user_input, user_id, log=False)
         print("starting eval student status")
         
         response = llm.chat([
@@ -187,8 +187,8 @@ learning world model:
             print(f"err decode:\n {response.choices[0].message.content}")
             
 
-    def update_state(self, session_id: str,  eval_result: str, user_input: str):
-        context = self._prepare_context(session_id, user_input, log=False)
+    def update_state(self, session_id: str, eval_result: str, user_input: str, user_id: str):
+        context = self._prepare_context(session_id, user_input, user_id, log=False)
 
         response = llm.chat([
             {"role": "system", "content": f"""
@@ -205,7 +205,7 @@ learning world model:
         ], stream=False)
 
 
-    def _log(self, session_id, user_input, response):
+    def _log(self, session_id, user_input, response, user_id):
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         log = f"""
@@ -218,4 +218,4 @@ TEACHER:
 {response}
 """
 
-        append_file(f"data/history/{self.user_id}.log", log)
+        append_file(f"data/history/{user_id}.log", log)

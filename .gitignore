@@ -1,5 +1,6 @@
 data/sessions/*
 data/history/*
 data/student/*
+data/auth.db
 __pycache__/
 *.pyc
