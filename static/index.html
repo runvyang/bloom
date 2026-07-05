@@ -189,6 +189,15 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 }
 #send-btn:hover{background:var(--accent-hi);transform:scale(1.04)}
 #send-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+#mic-btn{
+  width:42px;height:42px;background:var(--surface2);color:var(--text2);
+  border:1px solid var(--border);border-radius:var(--r);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;cursor:pointer;font-size:18px;transition:all .15s;
+}
+#mic-btn:hover{background:var(--surface3);color:var(--text)}
+#mic-btn.recording{background:var(--red);color:#fff;border-color:var(--red);animation:pulse-mic .8s infinite}
+@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.4)}50%{box-shadow:0 0 0 8px rgba(248,113,113,0)}}
 .inp-hint{font-size:11px;color:var(--text3);margin-top:6px;padding-left:2px}
 
 /* ─── Right panel (daily tasks) ──────────────────────── */
@@ -415,7 +424,8 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       </div>
       <div id="input-area">
         <div class="inp-row">
-          <textarea id="ta" placeholder="输入消息… (Enter 发送 · Shift+Enter 换行)" rows="1"></textarea>
+          <textarea id="ta" placeholder="输入消息… (Enter 发送 · Shift+Enter 换行 · 🎤 语音输入)" rows="1"></textarea>
+          <button id="mic-btn" onclick="toggleVoice()" title="语音输入">🎤</button>
           <button id="send-btn" onclick="sendMsg()" title="Send (Enter)">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2.5"
@@ -604,6 +614,89 @@ marked.use({ gfm: true, breaks: true });
     }
   });
 })();
+
+// ─── Voice Input ────────────────────────────────────────
+let recognition = null;
+let isRecording = false;
+
+function initVoice(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById('mic-btn').style.display = 'none';
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'zh-CN';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    const ta = document.getElementById('ta');
+    ta.value = transcript;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
+    ta.focus();
+  };
+
+  recognition.onerror = (event) => {
+    console.log('Voice error:', event.error);
+    stopRecording();
+    if (event.error === 'not-allowed') {
+      toast('Microphone access denied');
+    }
+  };
+
+  recognition.onend = () => {
+    if (isRecording) {
+      // Auto-restart for continuous listening
+      try { recognition.start(); } catch(e) {}
+    }
+  };
+}
+
+function toggleVoice(){
+  if (!recognition) { toast('Voice input not supported in this browser'); return; }
+  if (isRecording) {
+    stopRecording();
+  } else {
+    startRecording();
+  }
+}
+
+function startRecording(){
+  try {
+    recognition.start();
+    isRecording = true;
+    const btn = document.getElementById('mic-btn');
+    btn.textContent = '🔴';
+    btn.classList.add('recording');
+    btn.title = '点击停止语音输入';
+    setStatus('Listening…', 'loading');
+    toast('🎤 正在聆听…请说话');
+  } catch(e) {
+    console.log('Voice start error:', e);
+  }
+}
+
+function stopRecording(){
+  isRecording = false;
+  try { recognition.stop(); } catch(e) {}
+  const btn = document.getElementById('mic-btn');
+  btn.textContent = '🎤';
+  btn.classList.remove('recording');
+  btn.title = '语音输入';
+  setStatus('Ready');
+}
+
+// Initialize voice on first click (browsers need user gesture)
+document.addEventListener('click', function initVoiceOnce(){
+  if (!recognition) initVoice();
+}, {once: true});
 
 // ─── Auth ───────────────────────────────────────────────
 function checkAuth() {
