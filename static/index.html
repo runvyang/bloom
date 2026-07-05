@@ -706,7 +706,8 @@ function logout() {
 }
 
 // ─── Tasks & Timer ─────────────────────────────────────
-let timers = {};  // course -> intervalId
+let timers = {};       // course -> intervalId
+let pausedTimers = {}; // course -> {remaining, elapsed, duration}
 let calendarYear, calendarMonth;
 
 function loadTasks(){
@@ -757,7 +758,14 @@ function renderTasks(tasks, streak){
       </div>
       <div class="timer-bar"><div class="timer-bar-fill${isDone ? ' done' : isActive && remaining < 300 ? ' warning' : ''}" style="width:${pct}%" id="bar-${t.course}"></div></div>
       ${isDone ? '<button class="task-btn done-btn" disabled>✅ Completed — Great job!</button>' :
-        isActive ? `<button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer">Complete Now</button>` :
+        isActive && pausedTimers[t.course] ? `<div style="display:flex;gap:6px">
+          <button class="task-btn start" onclick="resumeTimer('${t.course}')">▶ Resume</button>
+          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">Done</button>
+        </div>` :
+        isActive ? `<div style="display:flex;gap:6px">
+          <button class="task-btn start" onclick="pauseTimer('${t.course}')" style="background:var(--yellow);color:#000">⏸ Break</button>
+          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">Done</button>
+        </div>` :
         `<button class="task-btn start" onclick="startCourseTask('${t.course}')">▶ Start Learning</button>`}
     </div>`;
   }).join('');
@@ -808,10 +816,47 @@ function startTimer(course, elapsed, duration){
     if (remaining <= 0) {
       clearInterval(timers[course]);
       delete timers[course];
+      delete pausedTimers[course];
       completeCourseTask(course);
     }
   }, 1000);
   updateDisplay();
+}
+
+function pauseTimer(course){
+  if (!timers[course]) return;
+  clearInterval(timers[course]);
+  delete timers[course];
+  // Store current state for resume
+  const el = document.getElementById('timer-' + course);
+  if (el) {
+    const parts = el.textContent.split(':');
+    const remaining = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    const duration = 2400;
+    pausedTimers[course] = {
+      remaining: remaining,
+      elapsed: duration - remaining,
+      duration: duration
+    };
+  }
+  // Update status display
+  const statusEl = document.querySelector(`#task-${course} .task-status`);
+  if (statusEl) { statusEl.textContent = '⏸ Paused'; statusEl.className = 'task-status active'; }
+  const timerEl = document.getElementById('timer-' + course);
+  if (timerEl) timerEl.style.opacity = '0.5';
+  // Re-render buttons
+  loadTasks();
+}
+
+function resumeTimer(course){
+  const p = pausedTimers[course];
+  if (!p) return;
+  delete pausedTimers[course];
+  const timerEl = document.getElementById('timer-' + course);
+  if (timerEl) timerEl.style.opacity = '1';
+  startTimer(course, p.elapsed, p.duration);
+  // Re-render buttons
+  loadTasks();
 }
 
 async function startCourseTask(course){
@@ -828,6 +873,7 @@ async function startCourseTask(course){
 
 async function completeCourseTask(course){
   if (timers[course]) { clearInterval(timers[course]); delete timers[course]; }
+  delete pausedTimers[course];
   const r = await fetch(`${cfg.url}/tasks/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
