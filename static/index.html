@@ -1226,7 +1226,7 @@ function addCopyBtn(bubble, text){
   const spk = document.createElement('button');
   spk.className = 'speak-btn';
   spk.title = 'Read aloud';
-  spk.textContent = '🔊';
+spk.textContent = '🔊';
   spk.onclick = (e) => {
     e.stopPropagation();
     speakText(text, spk);
@@ -1246,12 +1246,22 @@ function addCopyBtn(bubble, text){
 }
 
 function speakText(text, btn){
-  // If already speaking, stop
+  // If already playing this message, stop it
+  if (btn && btn.classList.contains('playing')) {
+    speechSynthesis.cancel();
+    currentSpeech = null;
+    btn.classList.remove('playing');
+    btn.textContent = '🔊';
+    return;
+  }
+  // If another message is playing, stop it first
   if (currentSpeech) {
     speechSynthesis.cancel();
     currentSpeech = null;
-    document.querySelectorAll('.speak-btn.playing').forEach(b => b.classList.remove('playing'));
-    if (btn && btn.classList.contains('playing')) return;
+    document.querySelectorAll('.speak-btn.playing').forEach(b => {
+      b.classList.remove('playing');
+      b.textContent = '🔊';
+    });
   }
   // Strip markdown/LaTeX for cleaner speech
   const clean = text.replace(/\$\$[\s\S]*?\$\$/g, '').replace(/\$([^$]+)\$/g, '$1').replace(/[*_#`\[\]()]/g, '').trim();
@@ -1261,14 +1271,14 @@ function speakText(text, btn){
   utter.rate = 0.95;
   utter.onend = () => {
     currentSpeech = null;
-    if (btn) btn.classList.remove('playing');
+    if (btn) { btn.classList.remove('playing'); btn.textContent = '🔊'; }
   };
   utter.onerror = () => {
     currentSpeech = null;
-    if (btn) btn.classList.remove('playing');
+    if (btn) { btn.classList.remove('playing'); btn.textContent = '🔊'; }
   };
   currentSpeech = utter;
-  if (btn) btn.classList.add('playing');
+  if (btn) { btn.classList.add('playing'); btn.textContent = '⏹'; }
   speechSynthesis.speak(utter);
 }
 
