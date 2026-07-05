@@ -1,5 +1,13 @@
 model_list:
-  - model_name: deepseek-v4-flash    # 这个名称将在 Codex 中作为 --model 参数使用
+  - model_name: gpt-5.5
     litellm_params:
-      model: deepseek/deepseek-chat    # 指定使用 DeepSeek 的模型
+      model: deepseek/deepseek-v4
       api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: gpt-5.4
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+litellm_settings:
+  drop_params: true
