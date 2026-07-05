@@ -1,9 +1,10 @@
 from llm import OpenRouterClient
 from session_manager import SessionManager
 from memory import MemoryManager
-from utils import read_file, append_file
+from utils import read_file, append_file, copy_file
 from datetime import datetime
 import json
+import os
 from fastapi import BackgroundTasks
 
 llm = OpenRouterClient()
@@ -68,8 +69,8 @@ class ChatRuntime:
         """
         # 1. session
         if log:
-            session_manager.append(session_id, "user", user_input)
-        session = session_manager.load(session_id)
+            session_manager.append(session_id, "user", user_input, user_id)
+        session = session_manager.load(session_id, user_id)
         
         # 2. memory
         if log:
@@ -78,7 +79,10 @@ class ChatRuntime:
         related_sessions = "\n".join([m['memory'] for m in mem_context["results"]])
         
         # 3. static files
-        student_state = read_file("data/student_state.md")
+        student_state_path = f"data/student/{user_id}/student_state.md"
+        if not os.path.exists(student_state_path):
+            copy_file("data/student_state.md", student_state_path)
+        student_state = read_file(student_state_path)
         world_model = read_file("data/world_model.md")
         plan = read_file("data/planner.md")
         teacher_prompt = read_file("data/teacher_prompt.md")
@@ -135,7 +139,7 @@ learning world model:
         # 4. 更新 session
         finally:
             if full_response:
-                session_manager.append(session_id, "assistant", full_response)
+                session_manager.append(session_id, "assistant", full_response, user_id)
             self._log(session_id, user_input, full_response, user_id)
 
     def eval(self, session_id: str, user_input: str, user_id: str):
@@ -174,14 +178,14 @@ learning world model:
             print(f"got eval result ", eval_result)
             model_update_delta = eval_result["model_update_delta"]
             eval_text = merge_to_text(eval_result)
-            session_manager.update_plan(session_id, format_teaching_plan(eval_result["teaching_plan"]))
+            session_manager.update_plan(session_id, format_teaching_plan(eval_result["teaching_plan"]), user_id)
             print("successfully create eval result: ", eval_text)
             if len(model_update_delta) > 0:
                 delta_texts = []
                 for i, d in enumerate(model_update_delta, 1):
                     delta_texts.append(f"{i}. {format_delta(d)}")
                 state_update = "\n\n# DELTA UPDATE\n" + "\n".join(delta_texts)
-                append_file("data/student_state.md", state_update)
+                append_file(f"data/student/{user_id}/student_state.md", state_update)
                 print("receiving state updates: ", state_update)
         except json.JSONDecodeError as e:
             print(f"err decode:\n {response.choices[0].message.content}")

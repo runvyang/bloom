@@ -2,15 +2,15 @@ import os
 import json
 from datetime import datetime
 
-SESSION_DIR = "data/sessions"
+
+def _session_dir(user_id: str) -> str:
+    return f"data/student/{user_id}/sessions"
 
 
 class SessionManager:
-    def __init__(self):
-        os.makedirs(SESSION_DIR, exist_ok=True)
-
-    def load(self, session_id):
-        path = f"{SESSION_DIR}/{session_id}.json"
+    def load(self, session_id: str, user_id: str):
+        session_dir = _session_dir(user_id)
+        path = f"{session_dir}/{session_id}.json"
 
         if not os.path.exists(path):
             return {
@@ -24,8 +24,8 @@ class SessionManager:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def append(self, session_id, role, content):
-        session = self.load(session_id)
+    def append(self, session_id: str, role: str, content: str, user_id: str):
+        session = self.load(session_id, user_id)
 
         session["messages"].append({
             "role": role,
@@ -35,17 +35,19 @@ class SessionManager:
 
         session["updated_at"] = str(datetime.now())
 
-        self.save(session_id, session)
+        self.save(session_id, user_id, session)
 
         return session
 
-    def update_plan(self, session_id, plan, node=None):
-        session = self.load(session_id)
+    def update_plan(self, session_id: str, plan: str, user_id: str, node=None):
+        session = self.load(session_id, user_id)
         session["current_plan"] = plan
-        self.save(session_id, session)
+        self.save(session_id, user_id, session)
 
-    def save(self, session_id, session):
-        path = f"{SESSION_DIR}/{session_id}.json"
+    def save(self, session_id: str, user_id: str, session: dict):
+        session_dir = _session_dir(user_id)
+        path = f"{session_dir}/{session_id}.json"
 
+        os.makedirs(session_dir, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(session, f, ensure_ascii=False, indent=2)
