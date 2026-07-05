@@ -1163,6 +1163,14 @@ function setMode(txt){ document.getElementById('mode-lbl').textContent = txt; }
 
 // ─── Utils ───────────────────────────────────────────────
 function md(t){
+  // Pre-process: convert [...] math blocks to $$...$$ (LLMs often use this format)
+  t = t.replace(/\[\s*([\s\S]*?)\s*\]/g, (m, inner) => {
+    // Only convert if it looks like math (contains LaTeX commands)
+    if (/\\[a-zA-Z]+/.test(inner) || /\^|_|\{/.test(inner)) {
+      return '$$' + inner.trim() + '$$';
+    }
+    return m; // leave normal [text] alone
+  });
   let html;
   try { html = marked.parse(t||''); } catch { return esc(t); }
   // Render LaTeX math with KaTeX
