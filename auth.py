@@ -211,18 +211,23 @@ def get_user_state_content(username: str, course: str):
 
 
 def list_user_sessions(username: str) -> list:
-    """List session files for a user."""
+    """List session files for a user, sorted by modification time (newest first)."""
     sessions = []
     session_dir = f"data/student/{username}/sessions"
     if os.path.exists(session_dir):
-        for f in sorted(os.listdir(session_dir), reverse=True):
+        files = []
+        for f in os.listdir(session_dir):
             if f.endswith(".json"):
                 filepath = os.path.join(session_dir, f)
-                sessions.append({
-                    "session_id": f.replace(".json", ""),
-                    "size": os.path.getsize(filepath),
-                    "modified": datetime.fromtimestamp(os.path.getmtime(filepath)).isoformat()
-                })
+                files.append((filepath, f, os.path.getmtime(filepath)))
+        # Sort by modification time descending (newest first)
+        files.sort(key=lambda x: x[2], reverse=True)
+        for filepath, f, mtime in files:
+            sessions.append({
+                "session_id": f.replace(".json", ""),
+                "size": os.path.getsize(filepath),
+                "modified": datetime.fromtimestamp(mtime).isoformat()
+            })
     return sessions
 
 

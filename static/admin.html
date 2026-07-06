@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bloom Admin</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -82,6 +83,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .msg-bubble.assistant{background:var(--surface);border-left:3px solid var(--green)}
 .msg-role{font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:3px}
 .msg-time{font-size:9px;color:var(--text3);float:right}
+.msg-bubble p{margin:0 0 8px}.msg-bubble p:last-child{margin-bottom:0}
+.msg-bubble code{background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px;font-size:12px}
+.msg-bubble pre{background:rgba(0,0,0,.3);padding:10px;border-radius:6px;overflow-x:auto;margin:6px 0;font-size:11px}
+.msg-bubble ul,.msg-bubble ol{padding-left:18px;margin:4px 0}
+.msg-bubble table{border-collapse:collapse;margin:6px 0;font-size:11px}
+.msg-bubble td,.msg-bubble th{border:1px solid var(--border);padding:4px 8px}
+.msg-bubble th{background:var(--surface2)}
+.msg-bubble h1,.msg-bubble h2,.msg-bubble h3{font-size:14px;margin:10px 0 4px}
 
 /* Toast */
 .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;color:var(--text);z-index:9999;pointer-events:none;animation:ti .2s ease}
@@ -124,6 +133,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 </div>
 
 <script>
+marked.use({ gfm: true, breaks: true });
 const API = window.location.origin;
 let adminToken = localStorage.getItem('admin_token');
 let currentStudent = null;
@@ -250,7 +260,7 @@ async function showState(course){
   });
   const d = await r.json();
   document.getElementById('detail-area').innerHTML =
-    `<div class="state-content">${simpleMd(d.content)}</div>`;
+    `<div class="state-content">${md(d.content)}</div>`;
 }
 
 function showSessions(){
@@ -294,13 +304,13 @@ async function showSession(sessionId){
       const role = m.role === 'user' ? 'user' : 'assistant';
       html += `<div class="msg-bubble ${role}">
         <div class="msg-role">${m.role} <span class="msg-time">${m.time || ''}</span></div>
-        ${esc(m.content)}
+        ${md(m.content)}
       </div>`;
     });
   }
   if (s.current_plan) {
     html += `<div class="msg-bubble" style="border-left:3px solid var(--yellow)">
-      <div class="msg-role">📋 Plan</div>${esc(s.current_plan)}
+      <div class="msg-role">📋 Plan</div>${md(s.current_plan)}
     </div>`;
   }
 
@@ -308,19 +318,8 @@ async function showSession(sessionId){
 }
 
 // Simple markdown-like rendering
-function simpleMd(text){
-  return esc(text)
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\|(.+)\|/g, (m) => {
-      const cells = m.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
-      return `<tr>${cells}</tr>`;
-    })
-    .replace(/(<tr>.*<\/tr>\n?)+/g, '<table>$&</table>')
-    .replace(/^- (.+)$/gm, '• $1')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+function md(t){
+  try { return marked.parse(t||''); } catch { return esc(t); }
 }
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
