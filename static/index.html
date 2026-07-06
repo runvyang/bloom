@@ -413,11 +413,11 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
         <option value="english">🇬🇧 English</option>
         <option value="coding">💻 Coding</option>
       </select>
-      <button class="btn-icon" onclick="newSession()" title="New session">↺</button>
-      <button class="btn-icon" onclick="clearChat()" title="Clear messages">🗑</button>
+      <button class="btn-icon" onclick="newSession()" title="新会话">↺</button>
+      <button class="btn-icon" onclick="clearChat()" title="清空消息">🗑</button>
       <span id="user-label" style="font-size:12px;color:var(--text2);margin-right:2px"></span>
-      <button class="btn-ghost" onclick="logout()" style="font-size:11px;padding:3px 8px;display:none" id="logout-btn">Logout</button>
-      <button class="btn-sm" onclick="openSettings()">Settings</button>
+      <button class="btn-ghost" onclick="logout()" style="font-size:11px;padding:3px 8px;display:none" id="logout-btn">退出</button>
+      <button class="btn-sm" onclick="openSettings()">设置</button>
     </div>
   </header>
 
@@ -429,8 +429,8 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <div id="msgs">
         <div class="empty">
           <div class="empty-icon">💬</div>
-          <h3>Start a conversation</h3>
-          <p>Your AI teacher is ready.<br>Ask anything to begin.</p>
+          <h3>开始对话</h3>
+          <p>你的 AI 老师已就绪。<br>输入任何问题开始学习吧。</p>
         </div>
       </div>
       <div id="input-area">
@@ -455,10 +455,10 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <div class="rp-inner" id="rp-inner">
         <div id="streak-area"></div>
         <div id="tasks-area">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 Today's Tasks</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 今日任务</div>
           <div id="task-list" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
-        <button class="cal-btn" onclick="openCalendar()">📅 Learning Calendar</button>
+        <button class="cal-btn" onclick="openCalendar()">📅 学习日历</button>
       </div>
     </div>
 
@@ -467,7 +467,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
   <!-- Calendar Modal -->
   <div class="overlay" id="cal-modal" style="display:none" onclick="if(event.target===this)closeCalendar()">
     <div class="modal" style="width:400px">
-      <div class="modal-title" id="cal-title">📅 Learning Calendar</div>
+      <div class="modal-title" id="cal-title">📅 学习日历</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <button class="btn-ghost" onclick="calPrevMonth()" style="font-size:16px">←</button>
         <span id="cal-month-label" style="font-size:14px;font-weight:600"></span>
@@ -476,7 +476,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <div class="cal-grid" id="cal-grid"></div>
       <div id="cal-day-detail" style="margin-top:12px;font-size:12px;color:var(--text2)"></div>
       <div class="modal-foot">
-        <button class="btn-ghost" onclick="closeCalendar()">Close</button>
+        <button class="btn-ghost" onclick="closeCalendar()">关闭</button>
       </div>
     </div>
   </div>
@@ -484,11 +484,11 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
   <!-- Status bar -->
   <div id="sbar">
     <div class="sdot" id="sdot"></div>
-    <span id="stxt">Ready</span>
+    <span id="stxt">就绪</span>
     <span>·</span>
     <span id="srv-lbl"></span>
     <span>·</span>
-    <span id="mode-lbl">Mode: Auto-detect</span>
+    <span id="mode-lbl">模式：自动检测</span>
   </div>
 
 </div>
@@ -499,16 +499,16 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
     <div class="modal-title" id="auth-title">Login</div>
     <div id="auth-err" style="display:none;background:var(--surface2);border:1px solid var(--red);border-radius:7px;padding:9px 11px;font-size:12px;color:var(--red);margin-bottom:14px"></div>
     <div class="field">
-      <label>Username</label>
-      <input id="auth-user" type="text" placeholder="Enter username" autocomplete="username">
+      <label>用户名</label>
+      <input id="auth-user" type="text" placeholder="输入用户名" autocomplete="username">
     </div>
     <div class="field">
-      <label>Password</label>
-      <input id="auth-pass" type="password" placeholder="Enter password" autocomplete="current-password">
+      <label>密码</label>
+      <input id="auth-pass" type="password" placeholder="输入密码" autocomplete="current-password">
     </div>
     <div class="modal-foot" style="justify-content:space-between">
-      <button class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthMode()">Register instead</button>
-      <button class="btn-sm" id="auth-submit-btn" onclick="submitAuth()">Login</button>
+      <button class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthMode()">注册账号</button>
+      <button class="btn-sm" id="auth-submit-btn" onclick="submitAuth()">登录</button>
     </div>
   </div>
 </div>
@@ -516,29 +516,29 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 <!-- Settings modal -->
 <div class="overlay" id="modal" style="display:none" onclick="bgClick(event)">
   <div class="modal">
-    <div class="modal-title">⚙️ Settings</div>
+    <div class="modal-title">⚙️ 设置</div>
 
     <div class="field">
-      <label>Server URL</label>
-      <input id="srv-inp" type="text" value="" placeholder="Auto-detected from browser">
+      <label>服务器地址</label>
+      <input id="srv-inp" type="text" value="" placeholder="自动检测浏览器地址">
     </div>
     <div class="field">
-      <label>Session ID</label>
-      <input id="sid-inp" type="text" placeholder="Auto-generated">
+      <label>会话 ID</label>
+      <input id="sid-inp" type="text" placeholder="自动生成">
     </div>
 
     <hr class="divider">
 
-    <div class="sec-title">🔄 Update State (offline)</div>
+    <div class="sec-title">🔄 更新状态（离线）</div>
     <div class="field">
-      <label>Mode</label>
+      <label>模式</label>
       <select id="mode-sel">
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="full">Full</option>
+        <option value="daily">每日</option>
+        <option value="weekly">每周</option>
+        <option value="full">完整</option>
       </select>
     </div>
-    <button class="btn-ghost" style="width:100%" onclick="runUpdate()">Run /update_state</button>
+    <button class="btn-ghost" style="width:100%" onclick="runUpdate()">执行更新</button>
     <div class="rbox" id="upd-result"></div>
 
     <hr class="divider">
@@ -583,8 +583,8 @@ async def chat_stream(req: ChatReq):
     )</div>
 
     <div class="modal-foot">
-      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn-sm" onclick="saveSettings()">Save</button>
+      <button class="btn-ghost" onclick="closeModal()">取消</button>
+      <button class="btn-sm" onclick="saveSettings()">保存</button>
     </div>
   </div>
 </div>
@@ -670,14 +670,14 @@ function initVoice(){
 function startVoice(e){
   e.preventDefault();
   if (!recognition) initVoice();
-  if (!recognition) { toast('Voice not supported'); return; }
+  if (!recognition) { toast('当前浏览器不支持语音输入'); return; }
   voiceText = '';
   document.getElementById('ta').value = '';
   try { recognition.start(); } catch(e) {}
   const btn = document.getElementById('mic-btn');
   btn.textContent = '🔴';
   btn.classList.add('recording');
-  setStatus('Listening… hold to speak', 'loading');
+  setStatus('正在聆听…', 'loading');
 }
 
 function stopVoice(){
@@ -685,7 +685,7 @@ function stopVoice(){
   btn.textContent = '🎤';
   btn.classList.remove('recording');
   try { recognition.stop(); } catch(e) {}
-  setStatus('Ready');
+  setStatus('就绪');
 }
 
 // Initialize voice on first interaction
@@ -706,7 +706,7 @@ function checkAuth() {
         document.getElementById('auth-modal').style.display = 'none';
         document.getElementById('user-label').textContent = username;
         document.getElementById('logout-btn').style.display = '';
-        setStatus('Ready');
+        setStatus('就绪');
         loadTasks();
       } else {
         localStorage.removeItem('auth_token');
@@ -722,9 +722,9 @@ function checkAuth() {
 
 function showAuthModal() {
   document.getElementById('auth-modal').style.display = 'flex';
-  document.getElementById('auth-title').textContent = 'Login';
-  document.getElementById('auth-submit-btn').textContent = 'Login';
-  document.getElementById('auth-toggle-btn').textContent = 'Register instead';
+  document.getElementById('auth-title').textContent = '登录';
+  document.getElementById('auth-submit-btn').textContent = '登录';
+  document.getElementById('auth-toggle-btn').textContent = '注册账号';
   document.getElementById('auth-err').style.display = 'none';
   authMode = 'login';
 }
@@ -732,11 +732,11 @@ function showAuthModal() {
 function toggleAuthMode() {
   authMode = (authMode === 'login') ? 'register' : 'login';
   document.getElementById('auth-title').textContent =
-    authMode === 'login' ? 'Login' : 'Register';
+    authMode === 'login' ? '登录' : '注册';
   document.getElementById('auth-submit-btn').textContent =
-    authMode === 'login' ? 'Login' : 'Create Account';
+    authMode === 'login' ? '登录' : '创建账号';
   document.getElementById('auth-toggle-btn').textContent =
-    authMode === 'login' ? 'Register instead' : 'Login instead';
+    authMode === 'login' ? '注册账号' : '返回登录';
   document.getElementById('auth-err').style.display = 'none';
 }
 
@@ -746,7 +746,7 @@ async function submitAuth() {
   const errEl = document.getElementById('auth-err');
 
   if (!u || !p) {
-    errEl.textContent = 'Please fill in both fields';
+    errEl.textContent = '请填写用户名和密码';
     errEl.style.display = 'block';
     return;
   }
@@ -763,7 +763,7 @@ async function submitAuth() {
     const data = await resp.json();
 
     if (!resp.ok) {
-      errEl.textContent = data.detail || 'Authentication failed';
+      errEl.textContent = data.detail || '登录失败';
       errEl.style.display = 'block';
       return;
     }
@@ -774,11 +774,11 @@ async function submitAuth() {
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('user-label').textContent = username;
     document.getElementById('logout-btn').style.display = '';
-    toast('Welcome, ' + username + '!');
+    toast('欢迎回来，' + username + '！');
     loadTasks();
 
   } catch (err) {
-    errEl.textContent = 'Network error: ' + err.message;
+    errEl.textContent = '网络错误：' + err.message;
     errEl.style.display = 'block';
   }
 }
@@ -820,14 +820,14 @@ function renderTasks(tasks, streak){
     <div class="streak-badge">
       <div class="streak-flame">🔥</div>
       <div class="streak-num">${streak.streak}</div>
-      <div class="streak-label">Day Streak</div>
-      <div class="streak-today">Today: ${streak.today_courses}/2 courses · ${streak.today_minutes}min</div>
+      <div class="streak-label">连续打卡</div>
+      <div class="streak-today">今日：${streak.today_courses}/2 课程 · ${streak.today_minutes} 分钟</div>
     </div>`;
 
   // Tasks
   const tl = document.getElementById('task-list');
   if (!tasks || !tasks.length) {
-    tl.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:12px">No tasks yet.<br>Start a chat to begin!</div>';
+    tl.innerHTML = '<div style="font-size:11px;color:var(--text3);text-align:center;padding:12px">暂无任务。<br>开始对话即可自动生成！</div>';
     return;
   }
   tl.innerHTML = tasks.map(t => {
@@ -842,26 +842,26 @@ function renderTasks(tasks, streak){
     return `<div class="task-card ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" id="task-${t.course}">
       <div class="task-header">
         <span class="task-course">${courseEmoji(t.course)} ${t.course}</span>
-        <span class="task-order">Task ${t.task_order}</span>
+        <span class="task-order">任务 ${t.task_order}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span class="task-status ${isDone ? 'done' : isActive ? 'active' : 'pending'}">${isDone ? '✓ Done' : isActive ? '● Active' : 'Pending'}</span>
-        <span style="font-size:10px;color:var(--text3)">40 min</span>
+        <span class="task-status ${isDone ? 'done' : isActive ? 'active' : 'pending'}">${isDone ? '✓ 完成' : isActive ? '● 进行中' : '待开始'}</span>
+        <span style="font-size:10px;color:var(--text3)">40 分钟</span>
       </div>
       <div class="timer-display${isActive && remaining < 300 ? ' warning' : ''}${isDone ? ' done' : ''}" id="timer-${t.course}">
         ${isDone ? '40:00' : String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0')}
       </div>
       <div class="timer-bar"><div class="timer-bar-fill${isDone ? ' done' : isActive && remaining < 300 ? ' warning' : ''}" style="width:${pct}%" id="bar-${t.course}"></div></div>
-      ${isDone ? '<button class="task-btn done-btn" disabled>✅ Completed — Great job!</button>' :
+      ${isDone ? '<button class="task-btn done-btn" disabled>✅ 已完成 — 太棒了！</button>' :
         isActive && pausedTimers[t.course] ? `<div style="display:flex;gap:6px">
-          <button class="task-btn start" onclick="resumeTimer('${t.course}')">▶ Resume</button>
-          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">Done</button>
+          <button class="task-btn start" onclick="resumeTimer('${t.course}')">▶ 继续</button>
+          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">完成</button>
         </div>` :
         isActive ? `<div style="display:flex;gap:6px">
-          <button class="task-btn start" onclick="pauseTimer('${t.course}')" style="background:var(--yellow);color:#000">⏸ Break</button>
-          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">Done</button>
+          <button class="task-btn start" onclick="pauseTimer('${t.course}')" style="background:var(--yellow);color:#000">⏸ 休息</button>
+          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">完成</button>
         </div>` :
-        `<button class="task-btn start" onclick="startCourseTask('${t.course}')">▶ Start Learning</button>`}
+        `<button class="task-btn start" onclick="startCourseTask('${t.course}')">▶ 开始学习</button>`}
     </div>`;
   }).join('');
 
@@ -936,7 +936,7 @@ function pauseTimer(course){
   }
   // Update status display
   const statusEl = document.querySelector(`#task-${course} .task-status`);
-  if (statusEl) { statusEl.textContent = '⏸ Paused'; statusEl.className = 'task-status active'; }
+  if (statusEl) { statusEl.textContent = '⏸ 已暂停'; statusEl.className = 'task-status active'; }
   const timerEl = document.getElementById('timer-' + course);
   if (timerEl) timerEl.style.opacity = '0.5';
   // Re-render buttons
@@ -984,8 +984,8 @@ function celebrate(course){
   ov.className = 'celebrate';
   ov.innerHTML = `<div class="celebrate-box">
     <div class="celebrate-icon">🎉</div>
-    <div class="celebrate-text">${courseEmoji(course)} ${course} Complete!</div>
-    <div class="celebrate-sub">You've finished 40 minutes of focused learning.<br>Ready for the next course? Keep going! 💪</div>
+    <div class="celebrate-text">${courseEmoji(course)} ${course} 学习完成！</div>
+    <div class="celebrate-sub">你已经学满了 40 分钟。<br>准备开始下一个课程？继续加油！💪</div>
   </div>`;
   document.body.appendChild(ov);
   setTimeout(() => { ov.style.opacity='0'; ov.style.transition='opacity .5s'; }, 2500);
@@ -1029,7 +1029,7 @@ function renderCalendar(){
 
     const firstDay = new Date(calendarYear, calendarMonth - 1, 1).getDay();
     const daysInMonth = new Date(calendarYear, calendarMonth, 0).getDate();
-    const hdrs = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const hdrs = ['日','一','二','三','四','五','六'];
 
     let html = hdrs.map(h => `<div class="cal-day-hdr">${h}</div>`).join('');
     for (let i = 0; i < firstDay; i++) html += '<div></div>';
@@ -1063,7 +1063,7 @@ async function showDayDetail(ds){
       html += `<div style="padding:4px 0;font-size:11px">${courseEmoji(t.course)} ${t.course}: <span style="color:${t.status==='completed'?'var(--green)':'var(--text3)'}">${t.status}</span></div>`;
     });
   } else {
-    html += '<div style="color:var(--text3)">No learning activity</div>';
+    html += '<div style="color:var(--text3)">当天无学习记录</div>';
   }
   document.getElementById('cal-day-detail').innerHTML = html;
 }
@@ -1099,7 +1099,7 @@ async function tryStream(msg){
   const bid = addBubble('ai', null);
   const el  = document.getElementById(bid);
   cursor(el);
-  setStatus('Streaming…', 'loading');
+  setStatus('正在生成…', 'loading');
 
   try {
     const resp = await fetch(`${cfg.url}/chat/stream`, {
@@ -1117,7 +1117,7 @@ async function tryStream(msg){
       return false;
     }
 
-    setMode('Mode: SSE ✦');
+    setMode('模式：SSE ✦');
     const reader = resp.body.getReader();
     const dec    = new TextDecoder();
     let buf  = '';
@@ -1156,14 +1156,14 @@ async function tryStream(msg){
     // Finalize
     el.innerHTML = md(text);
     addCopyBtn(el, text);
-    setStatus('Ready');
+    setStatus('就绪');
     scrollBot();
     return true;
 
   } catch (err) {
     dropBubble(bid);
     if (err.name !== 'AbortError') return false;
-    setStatus('Timeout', 'err');
+    setStatus('超时', 'err');
     return true; // don't retry
   }
 }
@@ -1193,7 +1193,7 @@ function addBubble(role, text){
 
   const lbl = document.createElement('div');
   lbl.className = 'm-role';
-  lbl.textContent = role === 'user' ? 'You' : 'AI';
+  lbl.textContent = role === 'user' ? '我' : 'AI 老师';
 
   const bbl = document.createElement('div');
   bbl.className = 'm-bubble';
@@ -1225,7 +1225,7 @@ function addCopyBtn(bubble, text){
   // Speak button
   const spk = document.createElement('button');
   spk.className = 'speak-btn';
-  spk.title = 'Read aloud';
+spk.title = '朗读';
 spk.textContent = '🔊';
   spk.onclick = (e) => {
     e.stopPropagation();
@@ -1240,7 +1240,7 @@ spk.textContent = '🔊';
   btn.textContent = '⎘';
   btn.onclick = (e) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(text).then(() => toast('Copied!'));
+    navigator.clipboard.writeText(text).then(() => toast('已复制！'));
   };
   bubble.appendChild(btn);
 }
@@ -1349,28 +1349,28 @@ function refreshSessLabel(){
 function switchCourse(){
   cfg.course = document.getElementById('course-sel').value;
   newSession();
-  toast('Switched to ' + cfg.course);
+  toast('已切换到 ' + cfg.course);
 }
 
 function newSession(){
   cfg.sid = genSid();
   refreshSessLabel();
   clearChat();
-  toast('New session started');
+  toast('已创建新会话');
 }
 
 function clearChat(){
   document.getElementById('msgs').innerHTML = `
     <div class="empty">
       <div class="empty-icon">💬</div>
-      <h3>Start a conversation</h3>
-      <p>Your AI teacher is ready.<br>Ask anything to begin.</p>
+      <h3>开始对话</h3>
+      <p>你的 AI 老师已就绪。<br>输入任何问题开始学习吧。</p>
     </div>`;
-  setMode('Mode: Auto-detect');
+  setMode('模式：自动检测');
 }
 
 function copySession(){
-  navigator.clipboard.writeText(cfg.sid).then(() => toast('Session ID copied!'));
+  navigator.clipboard.writeText(cfg.sid).then(() => toast('会话 ID 已复制！'));
 }
 
 function toast(msg){
@@ -1400,7 +1400,7 @@ function saveSettings(){
   if (url){ cfg.url = url; document.getElementById('srv-lbl').textContent = url; }
   if (sid){ cfg.sid = sid; refreshSessLabel(); }
   closeModal();
-  toast('Settings saved');
+  toast('设置已保存');
 }
 
 async function runUpdate(){
@@ -1408,7 +1408,7 @@ async function runUpdate(){
   const box  = document.getElementById('upd-result');
   box.style.display = 'block';
   box.className = 'rbox';
-  box.textContent = 'Running…';
+  box.textContent = '运行中…';
   try {
     const r = await fetch(`${cfg.url}/update_state`, {
       method: 'POST',
@@ -1420,7 +1420,7 @@ async function runUpdate(){
     box.textContent = JSON.stringify(d, null, 2);
   } catch(err){
     box.className = 'rbox err';
-    box.textContent = 'Error: ' + err.message;
+    box.textContent = '错误：' + err.message;
   }
 }
 </script>
