@@ -834,10 +834,8 @@ function renderTasks(tasks, streak){
     const isActive = t.status === 'in_progress';
     const isDone = t.status === 'completed';
     const elapsed = t.elapsed_seconds || 0;
-    const remaining = Math.max(0, (t.duration_seconds || 2400) - elapsed);
-    const min = Math.floor(remaining / 60);
-    const sec = remaining % 60;
-    const pct = ((elapsed / (t.duration_seconds || 2400)) * 100).toFixed(1);
+    const totalMin = Math.floor(elapsed / 60);
+    const pct = Math.min(100, (elapsed / (t.duration_seconds || 2400)) * 100).toFixed(1);
 
     return `<div class="task-card ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}" id="task-${t.course}">
       <div class="task-header">
@@ -846,28 +844,22 @@ function renderTasks(tasks, streak){
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span class="task-status ${isDone ? 'done' : isActive ? 'active' : 'pending'}">${isDone ? '✓ 完成' : isActive ? '● 进行中' : '待开始'}</span>
-        <span style="font-size:10px;color:var(--text3)">40 分钟</span>
+        <span style="font-size:10px;color:var(--text3)">${totalMin}/40 分钟</span>
       </div>
-      <div class="timer-display${isActive && remaining < 300 ? ' warning' : ''}${isDone ? ' done' : ''}" id="timer-${t.course}">
-        ${isDone ? '40:00' : String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0')}
+      <div class="timer-display${isActive ? '' : isDone ? ' done' : ''}" id="timer-${t.course}">
+        ${isActive ? totalMin : isDone ? 40 : 0}/40 分钟
       </div>
-      <div class="timer-bar"><div class="timer-bar-fill${isDone ? ' done' : isActive && remaining < 300 ? ' warning' : ''}" style="width:${pct}%" id="bar-${t.course}"></div></div>
+      <div class="timer-bar"><div class="timer-bar-fill${isDone ? ' done' : ''}" style="width:${pct}%" id="bar-${t.course}"></div></div>
       ${isDone ? '<button class="task-btn done-btn" disabled>✅ 已完成 — 太棒了！</button>' :
-        isActive && pausedTimers[t.course] ? `<div style="display:flex;gap:6px">
-          <button class="task-btn start" onclick="resumeTimer('${t.course}')">▶ 继续</button>
-          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">完成</button>
-        </div>` :
-        isActive ? `<div style="display:flex;gap:6px">
-          <button class="task-btn start" onclick="pauseTimer('${t.course}')" style="background:var(--yellow);color:#000">⏸ 休息</button>
-          <button class="task-btn done-btn" onclick="completeCourseTask('${t.course}')" style="background:var(--accent);color:#fff;cursor:pointer;flex:1">完成</button>
-        </div>` :
+        isActive && pausedTimers[t.course] ? `<button class="task-btn start" onclick="resumeTimer('${t.course}')">▶ 继续</button>` :
+        isActive ? `<button class="task-btn start" onclick="pauseTimer('${t.course}')" style="background:var(--yellow);color:#000">⏸ 休息</button>` :
         `<button class="task-btn start" onclick="startCourseTask('${t.course}')">▶ 开始学习</button>`}
     </div>`;
   }).join('');
 
   // Start timers for active tasks
   tasks.forEach(t => {
-    if (t.status === 'in_progress' && !timers[t.course]) {
+    if (t.status === 'in_progress' && !timers[t.course] && !heartbeats[t.course]) {
       startTimer(t.course, t.elapsed_seconds || 0, t.duration_seconds || 2400);
     }
   });
@@ -877,61 +869,73 @@ function courseEmoji(c){
   return {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[c] || '📝';
 }
 
+let heartbeats = {}; // course -> heartbeat intervalId
+
 function startTimer(course, elapsed, duration){
-  let remaining = duration - elapsed;
+  let currentElapsed = elapsed;
   const updateDisplay = () => {
-    const min = Math.floor(Math.max(0, remaining) / 60);
-    const sec = Math.max(0, remaining) % 60;
+    const totalMin = Math.floor(currentElapsed / 60);
     const el = document.getElementById('timer-' + course);
     const bar = document.getElementById('bar-' + course);
     if (el) {
-      el.textContent = String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
-      el.className = 'timer-display' + (remaining < 300 ? ' warning' : '') + (remaining <= 0 ? ' done' : '');
+      el.textContent = totalMin + '/40 分钟';
     }
     if (bar) {
-      const pct = ((elapsed / duration) * 100).toFixed(1);
+      const pct = Math.min(100, (currentElapsed / duration) * 100).toFixed(1);
       bar.style.width = pct + '%';
-      bar.className = 'timer-bar-fill' + (remaining < 300 ? ' warning' : '') + (remaining <= 0 ? ' done' : '');
     }
   };
 
+  // Client-side tick every second for display
   timers[course] = setInterval(() => {
-    remaining--;
-    elapsed++;
+    currentElapsed++;
     updateDisplay();
-    // Sync elapsed to server every 30s
-    if (elapsed % 30 === 0) {
-      fetch(`${cfg.url}/tasks/elapsed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-        body: JSON.stringify({ course, elapsed })
-      }).catch(() => {});
-    }
-    // Auto-complete at 0
-    if (remaining <= 0) {
-      clearInterval(timers[course]);
-      delete timers[course];
-      delete pausedTimers[course];
-      completeCourseTask(course);
-    }
   }, 1000);
+
+  // Heartbeat to server every 10 seconds
+  heartbeats[course] = setInterval(() => {
+    fetch(`${cfg.url}/tasks/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify({ course })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.completed) {
+        // Server says done — auto-complete
+        clearInterval(timers[course]);
+        clearInterval(heartbeats[course]);
+        delete timers[course];
+        delete heartbeats[course];
+        delete pausedTimers[course];
+        renderTasks(d.tasks);
+        celebrate(course);
+      } else {
+        // Sync elapsed from server
+        if (d.elapsed) currentElapsed = d.elapsed;
+      }
+    })
+    .catch(() => {});
+  }, 10000);
+
   updateDisplay();
 }
 
 function pauseTimer(course){
   if (!timers[course]) return;
   clearInterval(timers[course]);
+  clearInterval(heartbeats[course]);
   delete timers[course];
-  // Store current state for resume
+  delete heartbeats[course];
+  // Extract current elapsed from display
   const el = document.getElementById('timer-' + course);
   if (el) {
-    const parts = el.textContent.split(':');
-    const remaining = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    const duration = 2400;
+    const match = el.textContent.match(/(\d+)\/40/);
+    const elapsedMin = match ? parseInt(match[1]) : 0;
     pausedTimers[course] = {
-      remaining: remaining,
-      elapsed: duration - remaining,
-      duration: duration
+      remaining: (40 - elapsedMin) * 60,
+      elapsed: elapsedMin * 60,
+      duration: 2400
     };
   }
   // Update status display
@@ -968,6 +972,7 @@ async function startCourseTask(course){
 
 async function completeCourseTask(course){
   if (timers[course]) { clearInterval(timers[course]); delete timers[course]; }
+  if (heartbeats[course]) { clearInterval(heartbeats[course]); delete heartbeats[course]; }
   delete pausedTimers[course];
   const r = await fetch(`${cfg.url}/tasks/complete`, {
     method: 'POST',

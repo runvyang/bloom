@@ -144,16 +144,12 @@ def admin_get_session(username: str, session_id: str, admin: bool = Depends(get_
 # TASK & CALENDAR API
 # =========================
 from storage import (generate_daily_tasks, get_daily_tasks, start_task,
-                     complete_task, update_task_elapsed, get_streak_info,
+                     complete_task, heartbeat_task, get_streak_info,
                      get_calendar, get_daily_detail, get_recent_records)
 
 class TaskStartReq(BaseModel):
     course: str
     session_id: str = ""
-
-class TaskUpdateReq(BaseModel):
-    course: str
-    elapsed: int = 0
 
 @app.get("/tasks/today")
 def api_daily_tasks(user: dict = Depends(get_current_user)):
@@ -166,10 +162,9 @@ def api_start_task(req: TaskStartReq, user: dict = Depends(get_current_user)):
     tasks = start_task(user["username"], req.course, req.session_id)
     return {"tasks": tasks}
 
-@app.post("/tasks/elapsed")
-def api_update_elapsed(req: TaskUpdateReq, user: dict = Depends(get_current_user)):
-    update_task_elapsed(user["username"], req.course, req.elapsed)
-    return {"ok": True}
+@app.post("/tasks/heartbeat")
+def api_heartbeat(req: TaskStartReq, user: dict = Depends(get_current_user)):
+    return heartbeat_task(user["username"], req.course)
 
 @app.post("/tasks/complete")
 def api_complete_task(req: TaskStartReq, user: dict = Depends(get_current_user)):

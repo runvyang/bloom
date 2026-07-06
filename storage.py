@@ -190,27 +190,45 @@ def start_task(user_id: str, course: str, session_id: str) -> dict:
     return get_daily_tasks(user_id)
 
 
-def update_task_elapsed(user_id: str, course: str, elapsed: int):
+def heartbeat_task(user_id: str, course: str) -> dict:
+    """Add 10 seconds to elapsed time. Auto-complete if >= 40 min. Returns tasks + completed flag."""
     today = date.today().isoformat()
     conn = get_conn()
-    conn.execute(
-        "UPDATE daily_tasks SET elapsed_seconds=? WHERE user_id=? AND date=? AND course=? AND status='in_progress'",
-        (elapsed, user_id, today, course)
-    )
+    row = conn.execute(
+        "SELECT * FROM daily_tasks WHERE user_id=? AND date=? AND course=? AND status='in_progress'",
+        (user_id, today, course)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return {"tasks": get_daily_tasks(user_id), "completed": False}
+
+    elapsed = (row['elapsed_seconds'] or 0) + 10
+    duration = row['duration_seconds'] or 2400
+    completed = elapsed >= duration
+
+    if completed:
+        conn.execute(
+            """UPDATE daily_tasks SET status='completed', elapsed_seconds=?,
+               completed_at=datetime('now')
+               WHERE user_id=? AND date=? AND course=? AND status='in_progress'""",
+            (duration, user_id, today, course)
+        )
+    else:
+        conn.execute(
+            "UPDATE daily_tasks SET elapsed_seconds=? WHERE user_id=? AND date=? AND course=? AND status='in_progress'",
+            (elapsed, user_id, today, course)
+        )
     conn.commit()
     conn.close()
 
+    if completed:
+        _update_streak(user_id, today)
 
-def complete_task(user_id: str, course: str):
-    today = date.today().isoformat()
+    return {"tasks": get_daily_tasks(user_id), "completed": completed, "elapsed": min(elapsed, duration)}
+
+
+def _update_streak(user_id: str, today: str):
     conn = get_conn()
-    conn.execute(
-        """UPDATE daily_tasks SET status='completed', completed_at=datetime('now'),
-           elapsed_seconds=duration_seconds
-           WHERE user_id=? AND date=? AND course=? AND status='in_progress'""",
-        (user_id, today, course)
-    )
-    # Update streak
     row = conn.execute(
         "SELECT COUNT(*) as cnt FROM daily_tasks WHERE user_id=? AND date=? AND status='completed'",
         (user_id, today)
@@ -224,6 +242,25 @@ def complete_task(user_id: str, course: str):
     )
     conn.commit()
     conn.close()
+
+
+def complete_task(user_id: str, course: str):
+    today = date.today().isoformat()
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT duration_seconds FROM daily_tasks WHERE user_id=? AND date=? AND course=? AND status='in_progress'",
+        (user_id, today, course)
+    ).fetchone()
+    duration = row['duration_seconds'] if row else 2400
+    conn.execute(
+        """UPDATE daily_tasks SET status='completed', completed_at=datetime('now'),
+           elapsed_seconds=?
+           WHERE user_id=? AND date=? AND course=? AND status='in_progress'""",
+        (duration, user_id, today, course)
+    )
+    conn.commit()
+    conn.close()
+    _update_streak(user_id, today)
     return get_daily_tasks(user_id)
 
 
