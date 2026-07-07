@@ -24,7 +24,7 @@ class SessionManager:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    def append(self, session_id: str, role: str, content: str, user_id: str):
+    def append(self, session_id: str, role: str, content: str, user_id: str, course: str = ""):
         session = self.load(session_id, user_id)
 
         session["messages"].append({
@@ -34,14 +34,18 @@ class SessionManager:
         })
 
         session["updated_at"] = str(datetime.now())
+        if course and not session.get("course"):
+            session["course"] = course
 
         self.save(session_id, user_id, session)
 
         return session
 
-    def update_plan(self, session_id: str, plan: str, user_id: str, node=None):
+    def update_plan(self, session_id: str, plan: str, user_id: str, course: str = "", node=None):
         session = self.load(session_id, user_id)
         session["current_plan"] = plan
+        if course and not session.get("course"):
+            session["course"] = course
         self.save(session_id, user_id, session)
 
     def save(self, session_id: str, user_id: str, session: dict):

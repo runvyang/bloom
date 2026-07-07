@@ -1,6 +1,7 @@
 import sqlite3
 import uuid
 import os
+import json
 from datetime import datetime, timedelta
 import bcrypt
 
@@ -220,11 +221,19 @@ def list_user_sessions(username: str) -> list:
             if f.endswith(".json"):
                 filepath = os.path.join(session_dir, f)
                 files.append((filepath, f, os.path.getmtime(filepath)))
-        # Sort by modification time descending (newest first)
         files.sort(key=lambda x: x[2], reverse=True)
         for filepath, f, mtime in files:
+            # Try to read course from session JSON
+            course = ""
+            try:
+                with open(filepath, "r", encoding="utf-8") as sf:
+                    data = json.load(sf)
+                    course = data.get("course", "")
+            except Exception:
+                pass
             sessions.append({
                 "session_id": f.replace(".json", ""),
+                "course": course,
                 "size": os.path.getsize(filepath),
                 "modified": datetime.fromtimestamp(mtime).isoformat()
             })
@@ -235,7 +244,6 @@ def get_user_session_content(username: str, session_id: str):
     """Read a specific session file for a user."""
     path = f"data/student/{username}/sessions/{session_id}.json"
     if os.path.exists(path):
-        import json
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     return None

@@ -276,15 +276,18 @@ function showSessions(){
     return;
   }
 
-  const html = '<div class="session-list">' + sessionFiles.map(s => `
+  const html = '<div class="session-list">' + sessionFiles.map(s => {
+    const emoji = {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[s.course] || '📝';
+    const time = s.modified ? s.modified.replace('T', ' ').slice(0,19) : '';
+    return `
     <div class="session-item" onclick="showSession('${s.session_id}')">
       <div>
-        <div class="sid">${s.session_id.slice(0,24)}…</div>
-        <div class="meta">${s.modified} · ${(s.size/1024).toFixed(1)} KB</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:2px">${emoji} ${s.course || 'unknown'} · <span style="color:var(--accent-hi)">${time}</span></div>
+        <div class="sid" style="font-size:9px;opacity:.5">${s.session_id.slice(0,30)}…</div>
       </div>
       <span style="color:var(--text3);font-size:11px">→</span>
     </div>
-  `).join('') + '</div>';
+  `}).join('') + '</div>';
 
   document.getElementById('detail-area').innerHTML = html;
 }

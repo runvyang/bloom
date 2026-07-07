@@ -70,7 +70,7 @@ class ChatRuntime:
         """
         # 1. session
         if log:
-            session_manager.append(session_id, "user", user_input, user_id)
+            session_manager.append(session_id, "user", user_input, user_id, course)
         session = session_manager.load(session_id, user_id)
         
         # 2. memory
@@ -141,7 +141,7 @@ learning world model:
         # 4. 更新 session
         finally:
             if full_response:
-                session_manager.append(session_id, "assistant", full_response, user_id)
+                session_manager.append(session_id, "assistant", full_response, user_id, course)
             self._log(session_id, user_input, full_response, user_id)
 
     def eval(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
@@ -180,7 +180,7 @@ learning world model:
             print(f"got eval result ", eval_result)
             model_update_delta = eval_result["model_update_delta"]
             eval_text = merge_to_text(eval_result)
-            session_manager.update_plan(session_id, format_teaching_plan(eval_result["teaching_plan"]), user_id)
+            session_manager.update_plan(session_id, format_teaching_plan(eval_result["teaching_plan"]), user_id, course)
             print("successfully create eval result: ", eval_text)
             if len(model_update_delta) > 0:
                 delta_texts = []
