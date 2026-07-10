@@ -349,19 +349,64 @@ async function showUnifiedSession(course){
   });
   const d = await r.json();
 
-  let html = `<div style="font-size:12px;font-weight:600;margin-bottom:12px">📋 ${course} 统一会话日志 · ${d.messages.length} 条消息</div>`;
-  html += '<div style="display:flex;flex-direction:column;gap:6px">';
+  // Group messages into sessions (a new session starts at checkin or after >30min gap)
+  const sessions = [];
+  let currentSession = null;
+  const GAP_THRESHOLD = 30 * 60 * 1000; // 30 minutes
 
   d.messages.forEach(m => {
-    const role = m.role === 'user' ? 'user' : 'assistant';
-    const time = m.time ? m.time.replace('T', ' ').slice(0,19) : '';
-    html += `<div class="msg-bubble ${role}">
-      <div class="msg-role">${m.role} <span class="msg-time">${time}</span></div>
-      ${md(m.content || '')}
+    const time = m.time ? new Date(m.time) : new Date();
+    const isCheckin = m.content && m.content.includes('[学生进入课堂]');
+
+    if (!currentSession || isCheckin) {
+      if (currentSession) sessions.push(currentSession);
+      currentSession = { msgs: [], startTime: time, endTime: time };
+    } else if (currentSession.msgs.length > 0) {
+      const lastTime = new Date(currentSession.msgs[currentSession.msgs.length - 1].time || 0);
+      if (time - lastTime > GAP_THRESHOLD) {
+        sessions.push(currentSession);
+        currentSession = { msgs: [], startTime: time, endTime: time };
+      }
+    }
+
+    currentSession.msgs.push(m);
+    currentSession.endTime = time;
+  });
+  if (currentSession && currentSession.msgs.length > 0) sessions.push(currentSession);
+
+  // Sort sessions newest first
+  sessions.reverse();
+
+  let html = `<div style="font-size:12px;font-weight:600;margin-bottom:12px">📋 ${course} 会话 · ${sessions.length} 次课程</div>`;
+
+  sessions.forEach((sess, si) => {
+    const startStr = sess.startTime.toLocaleString('zh-CN');
+    const endStr = sess.endTime.toLocaleString('zh-CN');
+    const msgCount = sess.msgs.length;
+    const totalChars = sess.msgs.reduce((sum, m) => sum + (m.content || '').length, 0);
+    const userMsgs = sess.msgs.filter(m => m.role === 'user').length;
+
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">`;
+    html += `<div>
+      <span style="font-weight:600;font-size:13px">📅 第${sessions.length - si}次课</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:8px">${startStr} → ${endStr}</span>
     </div>`;
+    html += `<span style="font-size:10px;color:var(--text3)">${userMsgs}问${msgCount - userMsgs}答 · ${(totalChars/1024).toFixed(1)}KB</span>`;
+    html += `</div>`;
+
+    html += `<div style="display:flex;flex-direction:column;gap:4px">`;
+    sess.msgs.forEach(m => {
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      const time = m.time ? m.time.replace('T', ' ').slice(11, 19) : '';
+      html += `<div class="msg-bubble ${role}">
+        <div class="msg-role">${m.role} <span class="msg-time">${time}</span></div>
+        ${md(m.content || '')}
+      </div>`;
+    });
+    html += `</div></div>`;
   });
 
-  html += '</div>';
   document.getElementById('detail-area').innerHTML = html;
 }
 
