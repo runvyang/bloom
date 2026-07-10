@@ -1,4 +1,4 @@
-# 学习评估器（Evaluator）— 语文
+# 学习评估器（Evaluator）— 语文（小学）
 
 本模块负责对 chinese_state.md 的更新进行校准与约束。
 
