@@ -194,6 +194,22 @@ def api_records(course: str = "", user: dict = Depends(get_current_user)):
     return {"records": records}
 
 # =========================
+# CHECKIN API — proactive greeting
+# =========================
+class CheckinReq(BaseModel):
+    session_id: str
+    course: str = "math"
+
+@app.post("/checkin")
+def api_checkin(req: CheckinReq, user: dict = Depends(get_current_user)):
+    def generate():
+        for chunk in chat_runtime.checkin(req.session_id, user["username"], req.course):
+            yield f"data: {json.dumps(chunk)}\n\n"
+        yield "data: [DONE]\n\n"
+    return StreamingResponse(generate(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
+
+# =========================
 # CHAT API（实时教学）
 # =========================
 class ChatReq(BaseModel):
