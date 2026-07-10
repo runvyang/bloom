@@ -184,11 +184,11 @@ def init_session_tracking():
 def mark_session_active(user_id: str, course: str, session_id: str):
     conn = get_conn()
     row = conn.execute(
-        "SELECT session_id FROM session_tracking WHERE user_id=? AND course=?",
+        "SELECT last_session_id FROM session_tracking WHERE user_id=? AND course=?",
         (user_id, course)
     ).fetchone()
 
-    if row and row["session_id"] == session_id:
+    if row and row["last_session_id"] == session_id:
         # Same session — just update timestamp
         conn.execute(
             "UPDATE session_tracking SET last_active_at=datetime('now'), is_new_session=0 WHERE user_id=? AND course=?",
