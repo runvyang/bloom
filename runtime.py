@@ -155,15 +155,15 @@ class ChatRuntime:
                 full_response += content
 
         if full_response:
-            append_to_session(user_id, course, "user", "[学生进入课堂]")
-            append_to_session(user_id, course, "assistant", full_response)
+            append_to_session(user_id, course, "user", "[学生进入课堂]", session_id)
+            append_to_session(user_id, course, "assistant", full_response, session_id)
             self._log(user_id, course, "[checkin]", full_response)
 
     def teach(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
         """Stream a teaching response to the student."""
 
         mark_session_active(user_id, course, session_id)
-        append_to_session(user_id, course, "user", user_input)
+        append_to_session(user_id, course, "user", user_input, session_id)
         memory.add(user_id, user_input)
 
         context = _build_context(user_id, course, user_input)
@@ -198,7 +198,7 @@ class ChatRuntime:
 
         finally:
             if full_response:
-                append_to_session(user_id, course, "assistant", full_response)
+                append_to_session(user_id, course, "assistant", full_response, session_id)
             self._log(user_id, course, user_input, full_response)
 
     def eval(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
@@ -236,7 +236,7 @@ class ChatRuntime:
             # Append plan as assistant message for context
             plan_text = format_teaching_plan(eval_result["teaching_plan"])
             append_to_session(user_id, course, "assistant",
-                              f"[教学计划] {plan_text}")
+                              f"[教学计划] {plan_text}", session_id)
             print("successfully create eval result: ", eval_text)
             if len(model_update_delta) > 0:
                 delta_texts = []

@@ -20,14 +20,15 @@ def _mem_path(user_id: str, course: str) -> str:
     return f"data/student/{user_id}/{course}_mem.log"
 
 
-def append_to_session(user_id: str, course: str, role: str, content: str):
+def append_to_session(user_id: str, course: str, role: str, content: str, session_id: str = ""):
     """Append one message to the unified session log."""
     path = _log_path(user_id, course)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     entry = {
         "role": role,
         "content": content,
-        "time": datetime.now().isoformat()
+        "time": datetime.now().isoformat(),
+        "session_id": session_id
     }
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
