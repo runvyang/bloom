@@ -241,9 +241,45 @@ def list_user_sessions(username: str) -> list:
 
 
 def get_user_session_content(username: str, session_id: str):
-    """Read a specific session file for a user."""
+    """Read a specific (old-style) session file for a user."""
     path = f"data/student/{username}/sessions/{session_id}.json"
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     return None
+
+
+def list_unified_sessions(username: str) -> list:
+    """List unified course-based session logs ({course}_session.log)."""
+    sessions = []
+    student_dir = f"data/student/{username}"
+    if os.path.exists(student_dir):
+        for f in sorted(os.listdir(student_dir)):
+            if f.endswith("_session.log"):
+                course = f.replace("_session.log", "")
+                filepath = os.path.join(student_dir, f)
+                stat = os.stat(filepath)
+                sessions.append({
+                    "course": course,
+                    "file": f,
+                    "size": stat.st_size,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+    return sessions
+
+
+def get_unified_session_content(username: str, course: str) -> list:
+    """Read a unified session log, return list of message dicts."""
+    path = f"data/student/{username}/{course}_session.log"
+    if not os.path.exists(path):
+        return []
+    messages = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    messages.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+    return messages

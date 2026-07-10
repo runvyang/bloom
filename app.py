@@ -7,6 +7,7 @@ from runtime import ChatRuntime
 from auth import init_db, register_user, authenticate_user, validate_session, invalidate_session
 from auth import admin_login, validate_admin, admin_logout, list_users
 from auth import get_user_states, get_user_state_content, list_user_sessions, get_user_session_content
+from auth import list_unified_sessions, get_unified_session_content
 import json
 import os
 
@@ -139,6 +140,15 @@ def admin_get_session(username: str, session_id: str, admin: bool = Depends(get_
     if content is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"session": content, "username": username}
+
+@app.get("/admin/unified-sessions/{username}")
+def admin_list_unified_sessions(username: str, admin: bool = Depends(get_admin)):
+    return {"sessions": list_unified_sessions(username)}
+
+@app.get("/admin/unified-session/{username}/{course}")
+def admin_get_unified_session(username: str, course: str, admin: bool = Depends(get_admin)):
+    messages = get_unified_session_content(username, course)
+    return {"messages": messages, "course": course, "username": username}
 
 # =========================
 # TASK & CALENDAR API

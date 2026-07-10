@@ -140,6 +140,7 @@ let currentStudent = null;
 let currentTab = null;
 let stateFiles = [];
 let sessionFiles = [];
+let unifiedSessions = [];
 
 // Init
 (function(){
@@ -220,6 +221,13 @@ async function selectStudent(username){
   const sessD = await sessR.json();
   sessionFiles = sessD.sessions;
 
+  // Load unified sessions
+  const uR = await fetch(`${API}/admin/unified-sessions/${username}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const uD = await uR.json();
+  unifiedSessions = uD.sessions;
+
   renderTabs();
 }
 
@@ -236,8 +244,16 @@ function renderTabs(){
 
   // Session tab
   html += `<button class="tab" onclick="showSessions()">
-    💬 Sessions <span class="tab-count">${sessionFiles.length}</span>
+    💬 旧Sessions <span class="tab-count">${sessionFiles.length}</span>
   </button>`;
+
+  // Unified session tabs (one per course)
+  unifiedSessions.forEach(s => {
+    const emoji = {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[s.course] || '📝';
+    html += `<button class="tab" onclick="showUnifiedSession('${s.course}')">
+      ${emoji} ${s.course}会话
+    </button>`;
+  });
 
   html += '</div><div id="detail-area"></div>';
   content.innerHTML = html;
@@ -321,6 +337,34 @@ async function showSession(sessionId){
 }
 
 // Simple markdown-like rendering
+async function showUnifiedSession(course){
+  currentTab = 'unified-' + course;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  Array.from(document.querySelectorAll('.tab')).forEach(t => {
+    if (t.textContent.includes(course + '会话')) t.classList.add('active');
+  });
+
+  const r = await fetch(`${API}/admin/unified-session/${currentStudent}/${course}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const d = await r.json();
+
+  let html = `<div style="font-size:12px;font-weight:600;margin-bottom:12px">📋 ${course} 统一会话日志 · ${d.messages.length} 条消息</div>`;
+  html += '<div style="display:flex;flex-direction:column;gap:6px">';
+
+  d.messages.forEach(m => {
+    const role = m.role === 'user' ? 'user' : 'assistant';
+    const time = m.time ? m.time.replace('T', ' ').slice(0,19) : '';
+    html += `<div class="msg-bubble ${role}">
+      <div class="msg-role">${m.role} <span class="msg-time">${time}</span></div>
+      ${md(m.content || '')}
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('detail-area').innerHTML = html;
+}
+
 function md(t){
   try { return marked.parse(t||''); } catch { return esc(t); }
 }
