@@ -242,12 +242,24 @@ def get_current_plan(user_id: str, course: str) -> str:
 def migrate_old_sessions(user_id: str):
     """
     Migrate old per-session_id JSON files into unified course-based logs.
-    Scans data/student/{user_id}/sessions/ for old JSON files,
-    reads them, and appends messages to the appropriate {course}_session.log.
+    After migration, old JSON files are moved to sessions/.migrated/ to avoid re-processing.
     """
+    import hashlib
+
     old_dir = f"data/student/{user_id}/sessions"
     if not os.path.exists(old_dir):
         return 0
+
+    # Build a set of content hashes from existing unified logs (per course) to dedup
+    existing_hashes = {}  # course -> set of content hashes
+    for course in _list_courses(user_id):
+        existing_hashes[course] = set()
+        for m in get_all_messages(user_id, course):
+            h = hashlib.md5((m.get("content", "")[:200]).encode()).hexdigest()
+            existing_hashes[course].add(h)
+
+    migrated_dir = os.path.join(old_dir, ".migrated")
+    os.makedirs(migrated_dir, exist_ok=True)
 
     migrated = 0
     for fname in sorted(os.listdir(old_dir)):
@@ -265,27 +277,73 @@ def migrate_old_sessions(user_id: str):
         if not messages:
             continue
 
-        # Check if already migrated (avoid duplicates)
-        existing = get_all_messages(user_id, course)
-        if existing:
-            # Simple check: if any existing message matches first old message time
-            old_first_time = messages[0].get("time", "") if messages else ""
-            for em in existing:
-                if em.get("time") == old_first_time:
-                    break
-            else:
-                # Not found — append
-                for m in messages:
-                    append_to_session(user_id, course, m.get("role", "user"),
-                                      m.get("content", ""))
-                migrated += 1
-        else:
-            for m in messages:
-                append_to_session(user_id, course, m.get("role", "user"),
-                                  m.get("content", ""))
+        existing = existing_hashes.get(course, set())
+        new_count = 0
+        for m in messages:
+            content = m.get("content", "")
+            h = hashlib.md5((content[:200]).encode()).hexdigest()
+            if h not in existing:
+                append_to_session(user_id, course, m.get("role", "user"), content)
+                existing.add(h)
+                new_count += 1
+
+        if new_count > 0:
             migrated += 1
 
+        # Move old file to .migrated/ to prevent re-processing
+        try:
+            os.rename(filepath, os.path.join(migrated_dir, fname))
+        except OSError:
+            pass
+
     return migrated
+
+
+def dedup_session_log(user_id: str, course: str) -> int:
+    """Remove duplicate messages from an existing unified session log."""
+    import hashlib
+
+    path = _log_path(user_id, course)
+    if not os.path.exists(path):
+        return 0
+
+    messages = get_all_messages(user_id, course)
+    seen = set()
+    deduped = []
+    removed = 0
+    for m in messages:
+        h = hashlib.md5((m.get("content", "")[:200] + m.get("time", "")).encode()).hexdigest()
+        if h not in seen:
+            seen.add(h)
+            deduped.append(m)
+        else:
+            removed += 1
+
+    if removed > 0:
+        with open(path, "w", encoding="utf-8") as f:
+            for m in deduped:
+                f.write(json.dumps(m, ensure_ascii=False) + "\n")
+    return removed
+
+
+def dedup_all_sessions(user_id: str) -> int:
+    """Dedup all unified session logs for a user. Returns total removed."""
+    total = 0
+    for course in _list_courses(user_id):
+        total += dedup_session_log(user_id, course)
+    return total
+
+
+def _list_courses(user_id: str) -> list:
+    """List courses that have unified session logs for a user."""
+    student_dir = f"data/student/{user_id}"
+    if not os.path.exists(student_dir):
+        return []
+    courses = []
+    for f in os.listdir(student_dir):
+        if f.endswith("_session.log"):
+            courses.append(f.replace("_session.log", ""))
+    return courses
 
 
 # Initialize on import

@@ -4,7 +4,8 @@ from utils import read_file, append_file, copy_file
 from storage import save_learning_record, extract_knowledge_points, init_storage
 from session_store import (append_to_session, get_recent_rounds, get_compressed_mem,
                            mark_session_active, is_new_session, mark_checkin_sent,
-                           needs_compression, truncate_and_compress, migrate_old_sessions)
+                           needs_compression, truncate_and_compress, migrate_old_sessions,
+                           dedup_session_log)
 from datetime import datetime
 import json
 import os
@@ -61,6 +62,9 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
 
     # Migrate old sessions on first access
     migrate_old_sessions(user_id)
+
+    # One-time dedup of any duplicates from buggy migration
+    dedup_session_log(user_id, course)
 
     # Auto-compress if needed
     if needs_compression(user_id, course):
