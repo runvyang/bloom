@@ -125,7 +125,6 @@ function endCall(){
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   updateUI('idle');
 }
-}
 
 // ─── Audio playback ─────────────────────────────────────
 
@@ -163,16 +162,15 @@ function addTranscript(role, text){
 function updateUI(state){
   const icon = document.getElementById('status-icon');
   const callBtn = document.getElementById('call-btn');
-  const micBtn = document.getElementById('mic-btn');
   const timer = document.getElementById('timer');
   if (state === 'connected'){
     icon.textContent = '🗣️'; icon.classList.add('ringing');
     callBtn.className = 'end'; callBtn.textContent = '📞';
-    micBtn.style.display = ''; timer.style.display = 'block';
+    timer.style.display = 'block';
   } else {
     icon.textContent = '🎧'; icon.classList.remove('ringing');
     callBtn.className = 'start'; callBtn.textContent = '📞';
-    micBtn.style.display = 'none'; timer.style.display = 'none';
+    timer.style.display = 'none';
     setStatus('Ready'); document.getElementById('user-text').textContent = '';
   }
 }
