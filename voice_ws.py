@@ -38,12 +38,11 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
 
 
 def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
-    # Audio frames (msg_type=0b0010): header + sequence + payload (NO event_id)
-    # flags = 0b0001 (has_sequence only)
-    header = bytes([0x11, 0x21, 0x10, 0x00])
-    seq_bytes = struct.pack(">I", sequence)
+    # Audio frames (msg_type=0b0010): header + payload only — NO sequence, let server track
+    # flags = 0b0000 (no sequence, no event)
+    header = bytes([0x11, 0x20, 0x10, 0x00])
     payload_size_bytes = struct.pack(">I", len(audio_data))
-    return header + seq_bytes + payload_size_bytes + audio_data
+    return header + payload_size_bytes + audio_data
 
 
 def parse_frame(data: bytes):
