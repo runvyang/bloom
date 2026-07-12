@@ -189,10 +189,13 @@ async def handle_voice(ws):
                 evt = r.get("event"); p = r.get("payload_msg") or {}
                 if r.get("audio"): await ws.send_bytes(r["audio"])
                 elif evt == 451:
-                    text = (p.get("results") or [{}])[0].get("text", "")
-                    if text:
-                        print(f"[voice] ASR: {text}")
-                        await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
+                    # Only forward final (non-interim) ASR results
+                    results = p.get("results") or [{}]
+                    for r in results:
+                        if not r.get("is_interim", True) and r.get("text", "").strip():
+                            text = r["text"].strip()
+                            print(f"[voice] ASR final: {text}")
+                            await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
                 elif evt == 550:
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
                 elif evt == 350:
