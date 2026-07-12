@@ -182,30 +182,17 @@ async def handle_voice(ws):
             print(f"[voice] !!! Timeout waiting for SessionStarted")
             return
 
-        # If we got here, connection is alive
-        hello_frame = build_text_frame(300, session_id, {
-            "content": "Hello! Welcome to your English speaking practice. How are you today?"
-        })
-        print(f"[voice] -> SayHello ({len(hello_frame)} bytes)")
-        await volc_ws.send(hello_frame)
-
-        await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
-        print(f"[voice] Relay started (browser <-> Volcengine)")
-
+        # Start relay tasks FIRST, then send SayHello so TTS is captured
         seq = [0]
 
         async def browser_to_volc():
-            print(f"[voice] browser_to_volc relay started")
             while True:
                 try:
                     data = await ws.receive()
-                except Exception as e:
-                    print(f"[voice] browser_to_volc recv error: {e}")
+                except Exception:
                     break
                 if "bytes" in data:
-                    audio = data["bytes"]
-                    print(f"[voice] -> Volc audio: {len(audio)} bytes, seq={seq[0]}")
-                    await volc_ws.send(build_audio_frame(session_id, audio, seq[0]))
+                    await volc_ws.send(build_audio_frame(session_id, data["bytes"], seq[0]))
                     seq[0] += 1
                 elif "text" in data:
                     try:
@@ -217,7 +204,6 @@ async def handle_voice(ws):
                         pass
 
         async def volc_to_browser():
-            print(f"[voice] volc_to_browser relay started")
             while True:
                 try:
                     raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
@@ -230,25 +216,35 @@ async def handle_voice(ws):
                     continue
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
+                print(f"[voice] <- Volc event={eid}, audio={'audio' in frame}, json={json.dumps(p, ensure_ascii=False)[:200]}")
 
-                # Log ALL events for debugging
-                print(f"[voice] <- Volc event={eid}, has_audio={'audio' in frame}, json={json.dumps(p, ensure_ascii=False)[:300]}")
-
-                if eid == 451:  # ASR
+                if eid == 451:
                     text = (p.get("results") or [{}])[0].get("text", "")
-                    print(f"[voice] <- Volc ASR: {text}")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
-                elif eid == 550:  # Chat text
+                elif eid == 550:
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
-                elif eid == 350:  # TTS sentence start
+                elif eid == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 352:  # TTS audio
+                elif eid == 352:
                     if frame.get("audio"):
                         await ws.send_bytes(frame["audio"])
-                elif eid == 359:  # TTS ended
+                elif eid == 359:
                     await ws.send_text(json.dumps({"type": "tts_ended"}))
 
-        await asyncio.gather(browser_to_volc(), volc_to_browser())
+        b2v = asyncio.create_task(browser_to_volc())
+        v2b = asyncio.create_task(volc_to_browser())
+
+        # Send SayHello — TTS flows through already-running relay
+        await volc_ws.send(build_text_frame(300, session_id, {
+            "content": "Hello! Welcome to your English speaking practice. How are you today?"
+        }))
+
+        await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
+        print(f"[voice] Relay started (browser <-> Volcengine)")
+
+        done, pending = await asyncio.wait([b2v, v2b], return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
 
     except websockets.exceptions.ConnectionClosed as e:
         print(f"[voice] Volcengine closed: code={e.code}, reason={e.reason}")
