@@ -132,17 +132,17 @@ async def main():
     audio = make_audio(100, 440)
 
     # Test A: Audio-only, flags=0x00 (no sequence, no event), just payload
-    frame_a = bytes([0x11, 0x20, 0x10, 0x00]) + struct.pack(">I", len(audio)) + audio
+    frame_a = bytes([0x11, 0x20, 0x00, 0x00]) + struct.pack(">I", len(audio)) + audio
     if not await do_test(reader, writer, "A: Audio-only, no flags, bare payload", frame_a):
         print("Connection died — restart for more tests"); return
 
     # Test B: Audio-only, flags=0x01 (has sequence=1), just seq+payload
-    frame_b = bytes([0x11, 0x21, 0x10, 0x00]) + struct.pack(">I", 1) + struct.pack(">I", len(audio)) + audio
+    frame_b = bytes([0x11, 0x21, 0x00, 0x00]) + struct.pack(">I", 1) + struct.pack(">I", len(audio)) + audio
     if not await do_test(reader, writer, "B: Audio-only, seq=1, bare payload", frame_b):
         return
 
     # Test C: Audio-only, flags=0x01 (seq=1), WITH session_id
-    frame_c = (bytes([0x11, 0x21, 0x10, 0x00]) + struct.pack(">I", 1) +
+    frame_c = (bytes([0x11, 0x21, 0x00, 0x00]) + struct.pack(">I", 1) +
                struct.pack(">I", len(sb)) + sb + struct.pack(">I", len(audio)) + audio)
     if not await do_test(reader, writer, "C: Audio-only, seq=1 + session_id + audio", frame_c):
         return
