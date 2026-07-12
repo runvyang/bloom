@@ -161,7 +161,7 @@ async def handle_voice(ws):
         print(f"[voice] -> StartSession payload: {json.dumps(ss_payload, ensure_ascii=False)[:100]}...")
         await volc_ws.send(build_text_frame(100, session_id, ss_payload))
 
-        # Wait for SessionStarted
+        # Step 1: Wait for SessionStarted
         raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
         frame = parse_frame(raw)
         if not frame or frame.get("event_id") != 150:
@@ -169,16 +169,33 @@ async def handle_voice(ws):
             return
         print(f"[voice] Volc session started")
 
-        audio_count = [0]
+        # Step 2: Send greeting and WAIT for full response (matches working test_volc)
+        await volc_ws.send(build_text_frame(300, session_id, {
+            "content": "Hello! Welcome to your English speaking practice. How are you today?"
+        }))
+        print(f"[voice] Sent greeting, waiting for response...")
+
+        # Drain greeting response completely before starting audio
+        for _ in range(20):
+            try:
+                raw = await asyncio.wait_for(volc_ws.recv(), timeout=5)
+                frame = parse_frame(raw)
+                eid = frame.get("event_id") if frame else None
+                if frame and frame.get("audio"):
+                    await ws.send_bytes(frame["audio"])  # Play greeting TTS
+                if eid in (359, 559):  # TTSEnded or ChatEnded
+                    print(f"[voice] Greeting response complete")
+                    break
+            except asyncio.TimeoutError:
+                break
+
+        # Step 3: Start relay NOW that session is warmed up
         async def browser_to_volc():
             while True:
                 try: data = await ws.receive()
                 except Exception: break
                 if "bytes" in data:
-                    audio_count[0] += 1
                     await volc_ws.send(build_audio_frame(session_id, data["bytes"]))
-                    if audio_count[0] <= 5 or audio_count[0] % 100 == 0:
-                        print(f"[voice] audio #{audio_count[0]}: {len(data['bytes'])} bytes")
                 elif "text" in data:
                     try:
                         if json.loads(data["text"]).get("type") == "end_session":
@@ -195,18 +212,16 @@ async def handle_voice(ws):
                 if not frame: continue
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
-
-                if eid is not None or p:
-                    print(f"[voice] <- Volc eid={eid}, p={json.dumps(p, ensure_ascii=False)[:200]}, audio={'audio' in frame}")
+                print(f"[voice] <- eid={eid}, text={p.get('content',p.get('text',''))[:60]}")
 
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
-                elif eid == 550:  # Chat text
+                elif eid == 550:
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
-                elif eid == 350:  # TTS start
+                elif eid == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 352:  # TTS audio
+                elif eid == 352:
                     if frame.get("audio"):
                         await ws.send_bytes(frame["audio"])
                 elif eid == 359:
@@ -215,14 +230,8 @@ async def handle_voice(ws):
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
 
-        # Send greeting + ready AFTER relay tasks are running
-        await volc_ws.send(build_text_frame(300, session_id, {
-            "content": "Hello! Welcome to your English speaking practice. How are you today?"
-        }))
-        await asyncio.sleep(0.3)
-
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
-        print(f"[voice] Relay started")
+        print(f"[voice] Ready — start speaking!")
 
         done, pending = await asyncio.wait([b2v, v2b], return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
