@@ -193,6 +193,8 @@ async def handle_voice(ws):
                     break
                 if "bytes" in data:
                     await volc_ws.send(build_audio_frame(session_id, data["bytes"], seq[0]))
+                    if seq[0] % 50 == 0:
+                        print(f"[voice] -> Volc audio: seq={seq[0]}, {len(data['bytes'])} bytes")
                     seq[0] += 1
                 elif "text" in data:
                     try:

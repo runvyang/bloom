@@ -156,12 +156,30 @@ async function startCall(){
       else if (!wsReady) setStatus('无法连接到语音服务');
     };
 
-    // Send mic audio to server
+    // Send mic audio to server — with simple VAD (voice activity detection)
+    let silenceFrames = 0;
+    const SILENCE_THRESHOLD = 0.01;  // RMS energy below this = silence
+    const SILENCE_HANGOVER = 8;       // frames of silence before stopping (~0.5s at 64ms/frame)
+
     micNode.onaudioprocess = (e) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
       const input = e.inputBuffer.getChannelData(0);
-      const pcm = floatToPCM16(input);
-      ws.send(pcm);
+
+      // Calculate RMS energy
+      let sum = 0;
+      for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+      const rms = Math.sqrt(sum / input.length);
+
+      if (rms > SILENCE_THRESHOLD) {
+        // Speaking — send audio
+        silenceFrames = 0;
+        ws.send(floatToPCM16(input));
+      } else if (silenceFrames < SILENCE_HANGOVER) {
+        // Recently spoke — send trailing silence
+        silenceFrames++;
+        ws.send(floatToPCM16(input));
+      }
+      // else: long silence — don't send (let Volc VAD handle it)
     };
 
   } catch(e) {
