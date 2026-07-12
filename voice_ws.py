@@ -159,74 +159,48 @@ async def handle_voice(ws):
             }
         }
         print(f"[voice] -> StartSession payload: {json.dumps(ss_payload, ensure_ascii=False)[:100]}...")
-        ss_frame = build_text_frame(100, session_id, ss_payload)
-        print(f"[voice] -> StartSession ({len(ss_frame)} bytes), hex: {ss_frame[:40].hex()}...")
-        print(f"[voice] -> session_id={session_id}, sid_len={len(session_id)}")
-        await volc_ws.send(ss_frame)
+        await volc_ws.send(build_text_frame(100, session_id, ss_payload))
 
-        # Wait for SessionStarted (event 150)
-        print(f"[voice] Waiting for SessionStarted...")
-        try:
-            raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
-            frame = parse_frame(raw)
-            print(f"[voice] <- after StartSession: type={frame.get('type')}, event={frame.get('event_id')}")
-            if frame.get("json"):
-                print(f"[voice] <- JSON: {json.dumps(frame['json'], ensure_ascii=False)[:200]}")
-            if frame.get("event_id") != 150:
-                print(f"[voice] !!! Expected SessionStarted(150), got {frame.get('event_id')}")
-                return
-            dialog_id = (frame.get("json") or {}).get("dialog_id", "")
-            print(f"[voice] Volc session started, dialog_id={dialog_id}")
-        except asyncio.TimeoutError:
-            print(f"[voice] !!! Timeout waiting for SessionStarted")
+        # Wait for SessionStarted
+        raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
+        frame = parse_frame(raw)
+        if not frame or frame.get("event_id") != 150:
+            print(f"[voice] SessionStart failed: {frame}")
             return
-
-        # Start relay tasks FIRST, then send SayHello so TTS is captured
-        seq = [0]
+        print(f"[voice] Volc session started")
 
         async def browser_to_volc():
             while True:
-                try:
-                    data = await ws.receive()
-                except Exception:
-                    break
+                try: data = await ws.receive()
+                except Exception: break
                 if "bytes" in data:
-                    await volc_ws.send(build_audio_frame(session_id, data["bytes"], seq[0]))
-                    if seq[0] % 50 == 0:
-                        print(f"[voice] -> Volc audio: seq={seq[0]}, {len(data['bytes'])} bytes")
-                    seq[0] += 1
+                    await volc_ws.send(build_audio_frame(session_id, data["bytes"]))
                 elif "text" in data:
                     try:
-                        msg = json.loads(data["text"])
-                        if msg.get("type") == "end_session":
+                        if json.loads(data["text"]).get("type") == "end_session":
                             await volc_ws.send(build_text_frame(102, session_id, {}))
                             break
-                    except Exception:
-                        pass
+                    except Exception: pass
 
         async def volc_to_browser():
             while True:
-                try:
-                    raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
-                except asyncio.TimeoutError:
-                    continue
-                except Exception:
-                    break
+                try: raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
+                except asyncio.TimeoutError: continue
+                except Exception: break
                 frame = parse_frame(raw)
-                if not frame:
-                    continue
+                if not frame: continue
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
-                print(f"[voice] <- Volc event={eid}, audio={'audio' in frame}, json={json.dumps(p, ensure_ascii=False)[:200]}")
 
-                if eid == 451:
+                if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
+                    print(f"[voice] ASR: {text}")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
-                elif eid == 550:
+                elif eid == 550:  # Chat text
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
-                elif eid == 350:
+                elif eid == 350:  # TTS start
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 352:
+                elif eid == 352:  # TTS audio
                     if frame.get("audio"):
                         await ws.send_bytes(frame["audio"])
                 elif eid == 359:
@@ -235,9 +209,14 @@ async def handle_voice(ws):
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
 
-        # No SayHello — let the student speak first. Server will ASR+TTS naturally.
+        # Send greeting after relay is ready
+        await asyncio.sleep(0.5)
+        await volc_ws.send(build_text_frame(300, session_id, {
+            "content": "Hello! Welcome to your English speaking practice. How are you today?"
+        }))
+
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
-        print(f"[voice] Relay started (browser <-> Volcengine)")
+        print(f"[voice] Relay started")
 
         done, pending = await asyncio.wait([b2v, v2b], return_when=asyncio.FIRST_COMPLETED)
         for t in pending:
