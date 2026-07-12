@@ -168,11 +168,11 @@ async def handle_voice(ws):
             return
         print(f"[voice] Volc session started")
 
-        # Step 2: Send greeting and WAIT for full response (matches working test_volc)
-        await volc_ws.send(build_text_frame(300, session_id, {
-            "content": "Hello! Welcome to your English speaking practice. How are you today?"
+        # Step 2: Send text query to warm up session (matching working test_volc.py flow)
+        await volc_ws.send(build_text_frame(501, session_id, {
+            "content": "Hello! Please greet the student briefly."
         }))
-        print(f"[voice] Sent greeting, waiting for response...")
+        print(f"[voice] Sent warm-up text query, waiting for response...")
 
         # Drain ALL greeting responses (TTS audio + text + ended events)
         drained = 0
