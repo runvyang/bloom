@@ -1,1 +1,1 @@
-pip install mem0ai qdrant-client fastapi openai litellm[proxy] bcrypt
+pip install mem0ai qdrant-client fastapi openai litellm[proxy] bcrypt websockets

@@ -13,6 +13,13 @@ import os
 
 app = FastAPI(title="智能教学助手API", version="1.0.0")
 
+# Voice WebSocket route
+from voice_ws import handle_voice
+
+@app.websocket("/ws/voice/oral_english")
+async def ws_voice(ws):
+    await handle_voice(ws)
+
 # 初始化
 chat_runtime = ChatRuntime()
 init_db()
@@ -38,6 +45,11 @@ def root():
 def admin_page():
     """返回Admin管理页面"""
     return FileResponse("static/admin.html")
+
+@app.get("/oral-english")
+def oral_english_page():
+    """返回英语口语练习页面"""
+    return FileResponse("static/oral_english.html")
 
 # =========================
 # Auth dependency

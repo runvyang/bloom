@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oral English - Voice Practice</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--surface3:#21223a;
+  --border:#252744;--accent:#6366f1;--accent-hi:#818cf8;--text:#dde0f2;
+  --text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;
+  --sans:system-ui,-apple-system,sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+#app{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:40px 20px}
+
+/* Status */
+#status-icon{font-size:64px;transition:transform .3s}
+#status-icon.ringing{animation:pulse-icon 1s infinite}
+@keyframes pulse-icon{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+#status-text{font-size:16px;color:var(--text2);text-align:center;min-height:24px}
+#timer{font-family:monospace;font-size:24px;color:var(--accent);display:none}
+
+/* Call button */
+#call-btn{
+  width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;
+  font-size:32px;transition:all .2s;display:flex;align-items:center;justify-content:center;
+}
+#call-btn.start{background:var(--green);color:#fff}
+#call-btn.start:hover{transform:scale(1.08);box-shadow:0 0 24px rgba(74,222,128,.3)}
+#call-btn.end{background:var(--red);color:#fff}
+#call-btn.end:hover{transform:scale(1.08);box-shadow:0 0 24px rgba(248,113,113,.3)}
+
+/* User text (ASR) */
+#user-text{
+  font-size:14px;color:var(--accent-hi);text-align:center;
+  min-height:20px;max-width:500px;line-height:1.5;
+}
+
+/* Transcript */
+#transcript{
+  width:100%;max-width:600px;max-height:200px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:8px;padding:8px;
+}
+#transcript::-webkit-scrollbar{width:3px}
+#transcript::-webkit-scrollbar-thumb{background:var(--border)}
+.trans-line{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;animation:fade-in .3s}
+.trans-line.teacher{background:var(--surface);border-left:3px solid var(--green);align-self:flex-start}
+.trans-line.student{background:var(--surface2);border-left:3px solid var(--accent);align-self:flex-end}
+@keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* Back button */
+#back-btn{
+  position:fixed;top:16px;left:16px;padding:8px 14px;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none;
+}
+#back-btn:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<a href="/" id="back-btn">← 返回</a>
+<div id="app">
+  <div id="status-icon">🎧</div>
+  <div id="status-text">Ready to practice speaking</div>
+  <div id="timer">00:00</div>
+  <div id="user-text"></div>
+  <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
+  <div id="transcript"></div>
+</div>
+
+<script>
+const API = window.location.origin;
+let authToken = localStorage.getItem('auth_token');
+let ws = null;
+let audioCtx = null;
+let micStream = null;
+let micNode = null;
+let isCalling = false;
+let callStartTime = 0;
+let timerInterval = null;
+
+// Check auth
+(async function(){
+  if (!authToken) { window.location.href = '/'; return; }
+  const r = await fetch(`${API}/auth/me`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+  if (!r.ok) { window.location.href = '/'; return; }
+})();
+
+async function toggleCall(){
+  if (isCalling) {
+    endCall();
+  } else {
+    await startCall();
+  }
+}
+
+async function startCall(){
+  try {
+    // Init AudioContext
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+    // Get microphone (PCM 16kHz mono)
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    const source = audioCtx.createMediaStreamSource(micStream);
+    micNode = audioCtx.createScriptProcessor(4096, 1, 1);
+    source.connect(micNode);
+
+    // Connect WebSocket
+    const wsUrl = `${API.replace('http','ws')}/ws/voice/oral_english?token=${authToken}`;
+    ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      isCalling = true;
+      callStartTime = Date.now();
+      updateUI('connected');
+      startTimer();
+    };
+
+    ws.onmessage = (event) => {
+      if (typeof event.data === 'string') {
+        const msg = JSON.parse(event.data);
+        handleMessage(msg);
+      } else {
+        // Audio from server — play it
+        playAudio(event.data);
+      }
+    };
+
+    ws.onerror = () => { endCall(); };
+    ws.onclose = () => { if (isCalling) endCall(); };
+
+    // Send mic audio to server
+    micNode.onaudioprocess = (e) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const pcm = floatToPCM16(input);
+      ws.send(pcm);
+    };
+
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('timeout')), 10000);
+      const handler = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'ready' || msg.type === 'session_started') {
+          clearTimeout(timeout);
+          ws.removeEventListener('message', handler);
+          resolve();
+        }
+      };
+      ws.addEventListener('message', handler);
+    });
+
+  } catch(e) {
+    console.error('Call start error:', e);
+    setStatus('Microphone access needed for voice practice');
+    endCall();
+  }
+}
+
+function endCall(){
+  isCalling = false;
+  if (ws) {
+    try { ws.send(JSON.stringify({type:'end_session'})); } catch(e) {}
+    setTimeout(() => { try { ws.close(); } catch(e) {} }, 500);
+    ws = null;
+  }
+  if (micNode) { micNode.disconnect(); micNode = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  updateUI('idle');
+}
+
+function handleMessage(msg){
+  switch(msg.type){
+    case 'ready':
+    case 'session_started':
+      setStatus('Connected! Start speaking...');
+      break;
+    case 'asr':
+      document.getElementById('user-text').textContent = msg.text || '';
+      if (msg.text) addTranscript('student', msg.text);
+      break;
+    case 'chat_text':
+      addTranscript('teacher', msg.content || '');
+      break;
+    case 'tts_start':
+      if (msg.text) addTranscript('teacher', msg.text);
+      break;
+    case 'error':
+      setStatus('Error: ' + msg.message);
+      break;
+  }
+}
+
+function playAudio(arraybuffer){
+  if (!audioCtx || audioCtx.state === 'closed') return;
+  try {
+    const pcm = new Int16Array(arraybuffer);
+    const buffer = audioCtx.createBuffer(1, pcm.length, 24000);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start();
+  } catch(e) { console.error('audio play error:', e); }
+}
+
+function floatToPCM16(float32){
+  const buf = new ArrayBuffer(float32.length * 2);
+  const view = new DataView(buf);
+  for (let i = 0; i < float32.length; i++) {
+    let s = Math.max(-1, Math.min(1, float32[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return buf;
+}
+
+function addTranscript(role, text){
+  const el = document.getElementById('transcript');
+  const line = document.createElement('div');
+  line.className = 'trans-line ' + role;
+  line.textContent = text;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateUI(state){
+  const icon = document.getElementById('status-icon');
+  const btn = document.getElementById('call-btn');
+  const timer = document.getElementById('timer');
+
+  if (state === 'connected'){
+    icon.textContent = '🗣️';
+    icon.classList.add('ringing');
+    btn.className = 'end';
+    btn.textContent = '📞';
+    timer.style.display = 'block';
+    setStatus('Speaking practice in progress...');
+  } else {
+    icon.textContent = '🎧';
+    icon.classList.remove('ringing');
+    btn.className = 'start';
+    btn.textContent = '📞';
+    timer.style.display = 'none';
+    setStatus('Ready to practice speaking');
+    document.getElementById('user-text').textContent = '';
+  }
+}
+
+function setStatus(txt){ document.getElementById('status-text').textContent = txt; }
+
+function startTimer(){
+  timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    document.getElementById('timer').textContent =
+      String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+  }, 1000);
+}
+</script>
+</body>
+</html>

@@ -412,6 +412,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
         <option value="chinese">📖 Chinese</option>
         <option value="english">🇬🇧 English</option>
         <option value="coding">💻 Coding</option>
+        <option value="oral_english">🎙 Oral English</option>
       </select>
       <button class="btn-icon" onclick="newSession()" title="新会话">↺</button>
       <button class="btn-icon" onclick="clearChat()" title="清空消息">🗑</button>
@@ -1397,7 +1398,12 @@ function refreshSessLabel(){
 
 // ─── UI actions ──────────────────────────────────────────
 function switchCourse(){
-  cfg.course = document.getElementById('course-sel').value;
+  const v = document.getElementById('course-sel').value;
+  if (v === 'oral_english') {
+    window.location.href = '/oral-english';
+    return;
+  }
+  cfg.course = v;
   newSession();
   toast('已切换到 ' + cfg.course);
 }
