@@ -52,6 +52,26 @@ def parse_frame(data: bytes):
     msg_type = (data[1] >> 4) & 0x0F
     flags = data[1] & 0x0F
     offset = 4
+
+    # Error frames (msg_type=0x0F): code(4) then payload_size+payload
+    error_code = None
+    if msg_type == 0x0F and len(data) >= offset + 4:
+        error_code = struct.unpack("<I", data[offset:offset + 4])[0]
+        offset += 4
+        payload = None
+        if len(data) >= offset + 4:
+            payload_size = struct.unpack("<I", data[offset:offset + 4])[0]
+            offset += 4
+            if payload_size > 0 and len(data) >= offset + payload_size:
+                payload = data[offset:offset + payload_size]
+        result = {"type": msg_type, "error_code": error_code}
+        if payload:
+            try:
+                result["json"] = json.loads(payload.decode("utf-8"))
+            except Exception:
+                result["text"] = payload.decode("utf-8", errors="replace")
+        return result
+
     has_event = (flags & 0x04) != 0
     event_id = None
     if has_event and len(data) >= offset + 4:
@@ -128,11 +148,11 @@ async def handle_voice(ws):
 
         raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
         frame = parse_frame(raw)
-        print(f"[voice] <- after StartConnection: type={frame.get('type')}, event={frame.get('event_id')}")
+        print(f"[voice] <- after StartConnection: type={frame.get('type')}, event={frame.get('event_id')}, error_code={frame.get('error_code')}")
+        if frame.get("json"):
+            print(f"[voice] <- frame payload: {json.dumps(frame['json'], ensure_ascii=False)}")
         if frame.get("event_id") != 50:
-            print(f"[voice] !!! Expected ConnectionStarted(50), got {frame.get('event_id')}")
-            if frame.get("json"):
-                print(f"[voice] !!! Error: {json.dumps(frame['json'], ensure_ascii=False)}")
+            print(f"[voice] !!! Expected ConnectionStarted(50)")
             return
 
         # Step 2: StartSession
