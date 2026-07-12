@@ -127,20 +127,22 @@ async def handle_voice(ws):
         print(f"[voice] -> StartConnection ({len(sc_frame)} bytes): {sc_frame[:20].hex()}...")
         await volc_ws.send(sc_frame)
 
-        # StartSession
-        ss_frame = build_text_frame(100, session_id, {
+        # StartSession — keep system_role very short for testing
+        ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}},
             "dialog": {
-                "bot_name": "English Teacher",
-                "system_role": get_oral_english_prompt(),
-                "speaking_style": "friendly patient English teacher, speak clearly, encourage",
+                "bot_name": "Teacher",
+                "system_role": "You are an English teacher.",
+                "speaking_style": "friendly, patient",
                 "extra": {"model": "1.2.1.1"}
             },
             "tts": {
                 "speaker": "zh_female_vv_jupiter_bigtts",
                 "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}
             }
-        })
+        }
+        print(f"[voice] -> StartSession payload: {json.dumps(ss_payload, ensure_ascii=False)[:100]}...")
+        ss_frame = build_text_frame(100, session_id, ss_payload)
         print(f"[voice] -> StartSession ({len(ss_frame)} bytes)")
         await volc_ws.send(ss_frame)
 
