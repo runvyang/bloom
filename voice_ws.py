@@ -215,11 +215,11 @@ async def handle_voice(ws):
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
 
-        # Send greeting after relay is ready
-        await asyncio.sleep(0.5)
+        # Send greeting + ready AFTER relay tasks are running
         await volc_ws.send(build_text_frame(300, session_id, {
             "content": "Hello! Welcome to your English speaking practice. How are you today?"
         }))
+        await asyncio.sleep(0.3)
 
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
         print(f"[voice] Relay started")

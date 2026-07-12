@@ -178,6 +178,8 @@ async function startCall(){
           rms > SILENCE_THRESHOLD ? '🎤 检测到语音...' : (silenceFrames < SILENCE_HANGOVER ? '...' : '🔇 静音中');
       }
 
+      if (!wsReady) return;  // Don't send audio until server says ready
+
       if (rms > SILENCE_THRESHOLD) {
         silenceFrames = 0;
         ws.send(floatToPCM16(input));
