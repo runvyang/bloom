@@ -185,9 +185,11 @@ async def handle_voice(ws):
             return
 
         # If we got here, connection is alive
-        await volc_ws.send(build_text_frame(300, session_id, {
+        hello_frame = build_text_frame(300, session_id, {
             "content": "Hello! Welcome to your English speaking practice. How are you today?"
-        }))
+        })
+        print(f"[voice] -> SayHello ({len(hello_frame)} bytes)")
+        await volc_ws.send(hello_frame)
 
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
         print(f"[voice] Relay started (browser <-> Volcengine)")
@@ -230,6 +232,11 @@ async def handle_voice(ws):
                     continue
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
+
+                # Log ALL events for debugging
+                print(f"[voice] <- Volc event={eid}, has_audio={'audio' in frame}, json_keys={list(p.keys()) if p else 'none'}")
+                if eid is None and frame.get('text'):
+                    print(f"[voice] <- Volc text: {frame['text'][:200]}")
 
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
