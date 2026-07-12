@@ -7,17 +7,18 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--border:#252744;--accent:#6366f1;--text:#dde0f2;--text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;--sans:system-ui,sans-serif}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
-#app{height:100vh;display:flex;flex-direction:column;padding:0}
-#top-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
-#status-icon{font-size:24px;transition:transform .3s}
+#app{height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 20px 0}
+#status-area{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 0;flex-shrink:0}
+#status-icon{font-size:48px;transition:transform .3s}
 #status-icon.ringing{animation:pulse-icon 1s infinite}
 @keyframes pulse-icon{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-#status-text{font-size:12px;color:var(--text2);flex:1}
-#timer{font-family:monospace;font-size:14px;color:var(--accent);display:none}
-#call-btn{width:44px;height:44px;border-radius:50%;border:none;cursor:pointer;font-size:20px;transition:all .2s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#status-text{font-size:14px;color:var(--text2);text-align:center;min-height:20px}
+#timer{font-family:monospace;font-size:18px;color:var(--accent);display:none}
+#call-btn{width:64px;height:64px;border-radius:50%;border:none;cursor:pointer;font-size:28px;transition:all .2s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 #call-btn.start{background:var(--green);color:#fff}
+#call-btn.start:hover{transform:scale(1.08)}
 #call-btn.end{background:var(--red);color:#fff}
-#transcript{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:12px 14px;max-width:700px;width:100%;margin:0 auto}
+#transcript{flex:1;width:100%;max-width:700px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px 0 20px}
 #transcript::-webkit-scrollbar{width:3px}
 #transcript::-webkit-scrollbar-thumb{background:var(--border)}
 .trans-line{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;animation:fade-in .3s;max-width:85%}
@@ -56,17 +57,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 </div>
 <div id="app">
-  <div id="top-bar">
-    <a href="/" style="color:var(--text2);text-decoration:none;font-size:13px">←</a>
+  <div id="status-area">
     <div id="status-icon">🎧</div>
-    <span id="status-text">就绪</span>
-    <span id="timer">00:00</span>
-    <span style="flex:1"></span>
+    <div id="status-text">就绪</div>
+    <div id="timer">00:00</div>
     <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
-    <button id="settings-btn" onclick="toggleSettings()" style="position:static;width:28px;height:28px;font-size:14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text3);cursor:pointer">⚙</button>
   </div>
   <div id="transcript"></div>
 </div>
+
+<a href="/" style="position:fixed;top:12px;left:12px;color:var(--text3);text-decoration:none;font-size:13px;z-index:10">←</a>
+<button onclick="toggleSettings()" style="position:fixed;top:12px;right:12px;width:30px;height:30px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text3);cursor:pointer;font-size:16px;z-index:10">⚙</button>
+<div id="settings-panel">
 
 <script>
 const API = window.location.origin;
