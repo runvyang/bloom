@@ -98,8 +98,19 @@ async def main():
         print(f"✗ SessionStart failed: {f}"); return
     print(f"✓ Session started")
 
-    # Wait a beat, then send mock speech audio
-    await asyncio.sleep(0.5)
+    # Send text query first to "warm up" the session (matching working Test A)
+    print("→ Sending warm-up text query...")
+    writer.write(ws_frame(build_text(501, sid, {"content": "Hi!"}))); await writer.drain()
+    # Wait for response to complete
+    for i in range(10):
+        try:
+            raw = await asyncio.wait_for(ws_read(reader), timeout=5)
+            f = parse_frame(raw)
+            if f and f.get("event_id") in (359, 559): break
+        except: break
+    print("✓ Text query done, now sending audio...")
+
+    await asyncio.sleep(0.3)
     speech = make_speech_audio()
     print(f"→ Sending audio: {len(speech)} bytes ({len(speech)/32:.0f}ms)")
 
