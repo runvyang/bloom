@@ -283,3 +283,19 @@ def get_unified_session_content(username: str, course: str) -> list:
                 except json.JSONDecodeError:
                     pass
     return messages
+
+
+def reset_user_password(username: str, new_password: str) -> dict:
+    """Admin: reset a user's password."""
+    conn = get_connection()
+    user = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+    if not user:
+        conn.close()
+        return {"success": False, "error": "User not found"}
+    password_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    conn.execute("UPDATE users SET password_hash=? WHERE id=?", (password_hash, user["id"]))
+    # Invalidate all sessions for this user
+    conn.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": f"Password reset for {username}"}

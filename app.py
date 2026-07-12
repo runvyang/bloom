@@ -7,7 +7,7 @@ from runtime import ChatRuntime
 from auth import init_db, register_user, authenticate_user, validate_session, invalidate_session
 from auth import admin_login, validate_admin, admin_logout, list_users
 from auth import get_user_states, get_user_state_content, list_user_sessions, get_user_session_content
-from auth import list_unified_sessions, get_unified_session_content
+from auth import list_unified_sessions, get_unified_session_content, reset_user_password
 import json
 import os
 
@@ -161,6 +161,17 @@ def admin_list_unified_sessions(username: str, admin: bool = Depends(get_admin))
 def admin_get_unified_session(username: str, course: str, admin: bool = Depends(get_admin)):
     messages = get_unified_session_content(username, course)
     return {"messages": messages, "course": course, "username": username}
+
+class ResetPasswordReq(BaseModel):
+    username: str
+    new_password: str
+
+@app.post("/admin/reset-password")
+def admin_reset_password(req: ResetPasswordReq, admin: bool = Depends(get_admin)):
+    result = reset_user_password(req.username, req.new_password)
+    if not result["success"]:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
 
 # =========================
 # TASK & CALENDAR API

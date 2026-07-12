@@ -19,8 +19,6 @@ VOLC_API_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
 VOLC_RESOURCE_ID = "volc.speech.dialog"
 VOLC_APP_KEY = os.getenv("VOLC_APP_KEY", "")
 
-print(f"app_id:{VOLC_APP_ID}, access_key: {VOLC_ACCESS_KEY}, app_key: {VOLC_APP_KEY}")
-
 # ─── Binary Protocol Helpers ─────────────────────────────
 
 def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:

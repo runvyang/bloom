@@ -196,10 +196,35 @@ async function loadStudents(){
   const d = await r.json();
   const list = document.getElementById('student-list');
   list.innerHTML = d.users.map(u =>
-    `<div class="student-item" onclick="selectStudent('${u}')" id="stu-${u}">
-      <div class="student-dot"></div>${u}
+    `<div class="student-item" id="stu-${u}">
+      <div class="student-dot" onclick="selectStudent('${u}')"></div>
+      <span onclick="selectStudent('${u}')" style="flex:1">${u}</span>
+      <button onclick="event.stopPropagation();resetPassword('${u}')" title="重置密码" style="background:transparent;border:1px solid var(--border);color:var(--text3);cursor:pointer;border-radius:4px;padding:2px 6px;font-size:10px;opacity:0;transition:opacity .15s">🔑</button>
     </div>`
   ).join('');
+  // Hover to show reset button
+  document.querySelectorAll('.student-item').forEach(el => {
+    el.addEventListener('mouseenter', () => { el.querySelector('button').style.opacity='1'; });
+    el.addEventListener('mouseleave', () => { el.querySelector('button').style.opacity='0'; });
+  });
+}
+
+async function resetPassword(username){
+  const pw = prompt(`请输入 ${username} 的新密码（至少4位）：`);
+  if (!pw || pw.length < 4) { alert('密码至少4位'); return; }
+  try {
+    const r = await fetch(`${API}/admin/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ username, new_password: pw })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      alert(`✅ ${d.message}`);
+    } else {
+      alert('❌ ' + (d.detail || '失败'));
+    }
+  } catch(e) { alert('网络错误'); }
 }
 
 async function selectStudent(username){
