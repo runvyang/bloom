@@ -104,7 +104,7 @@ async function startCall(){
     // Get microphone (PCM 16kHz mono)
     micStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
     const source = audioCtx.createMediaStreamSource(micStream);
-    micNode = audioCtx.createScriptProcessor(4096, 1, 1);
+    micNode = audioCtx.createScriptProcessor(1024, 1, 1);  // ~64ms at 16kHz → 2048 bytes/packet
     source.connect(micNode);
     // Connect to destination with zero gain (required for onaudioprocess, prevents feedback)
     const zeroGain = audioCtx.createGain();
