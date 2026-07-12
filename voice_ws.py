@@ -121,10 +121,13 @@ async def handle_voice(ws):
         volc_ws = await websockets.connect(VOLC_API_URL, additional_headers=headers)
         print(f"[voice] Volcengine WS connected, starting session...")
 
-        # StartConnection
-        await volc_ws.send(build_text_frame(1, session_id, {}))
+        # StartConnection (event 1, no session_id)
+        sc_frame = build_text_frame(1, session_id, {})
+        print(f"[voice] -> StartConnection ({len(sc_frame)} bytes): {sc_frame[:20].hex()}...")
+        await volc_ws.send(sc_frame)
+
         # StartSession
-        await volc_ws.send(build_text_frame(100, session_id, {
+        ss_frame = build_text_frame(100, session_id, {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}},
             "dialog": {
                 "bot_name": "English Teacher",
@@ -136,24 +139,30 @@ async def handle_voice(ws):
                 "speaker": "zh_female_vv_jupiter_bigtts",
                 "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}
             }
-        }))
+        })
+        print(f"[voice] -> StartSession ({len(ss_frame)} bytes)")
+        await volc_ws.send(ss_frame)
 
-        # Wait for SessionStarted (event 150)
-        volc_ready = False
-        while not volc_ready:
+        # Wait for first response (SessionStarted or error)
+        print(f"[voice] Waiting for Volcengine response...")
+        try:
             raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
+            print(f"[voice] <- Volc raw ({len(raw)} bytes): {raw[:60].hex()}")
             frame = parse_frame(raw)
-            if frame and frame.get("event_id") == 150:
-                volc_ready = True
-                dialog_id = (frame.get("json") or {}).get("dialog_id", "")
-                print(f"[voice] Volc session started, dialog_id={dialog_id}")
+            print(f"[voice] <- Volc frame: type={frame.get('type')}, event={frame.get('event_id')}")
+            if frame.get("json"):
+                print(f"[voice] <- Volc JSON: {json.dumps(frame['json'], ensure_ascii=False)[:200]}")
+            if frame.get("event_id") == 0x0F:  # Error frame
+                print(f"[voice] !!! Volc ERROR frame received")
+        except asyncio.TimeoutError:
+            print(f"[voice] !!! Timeout waiting for Volc response")
+            return
 
-        # SayHello
+        # If we got here, connection is alive
         await volc_ws.send(build_text_frame(300, session_id, {
             "content": "Hello! Welcome to your English speaking practice. How are you today?"
         }))
 
-        # Tell browser we're ready
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
         print(f"[voice] Relay started (browser <-> Volcengine)")
 
@@ -206,8 +215,8 @@ async def handle_voice(ws):
 
         await asyncio.gather(browser_to_volc(), volc_to_browser())
 
-    except websockets.exceptions.ConnectionClosed:
-        print(f"[voice] Volcengine connection closed")
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"[voice] Volcengine closed: code={e.code}, reason={e.reason}")
     except Exception as e:
         print(f"[voice] Error: {type(e).__name__}: {e}")
         traceback.print_exc()
