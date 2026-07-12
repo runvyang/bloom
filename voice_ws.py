@@ -165,8 +165,19 @@ async def handle_voice(ws):
                         print(f"[voice] audio #{n}: {len(data['bytes'])} bytes")
                 elif "text" in data:
                     try:
-                        if json.loads(data["text"]).get("type") == "end_session":
+                        msg = json.loads(data["text"])
+                        if msg.get("type") == "end_session":
                             await volc_ws.send(build_text_frame(102, sid, {})); break
+                        elif msg.get("type") == "update_config":
+                            # UpdateConfig event (201) — change speaker/speed mid-call
+                            await volc_ws.send(build_text_frame(201, sid, {
+                                "tts": {
+                                    "speaker": msg.get("speaker", "zh_female_vv_jupiter_bigtts"),
+                                    "audio_config": {
+                                        "speech_rate": int((msg.get("speed", 1.0) - 1.0) * 100)
+                                    }
+                                }
+                            }))
                     except Exception: pass
 
         async def volc_to_browser():

@@ -27,10 +27,40 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 @keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 #back-btn{position:fixed;top:16px;left:16px;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none}
 #back-btn:hover{color:var(--text)}
+#settings-btn{position:fixed;top:16px;right:16px;width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+#settings-btn:hover{color:var(--text)}
+#settings-panel{position:fixed;top:56px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;width:240px;display:none;z-index:100}
+#settings-panel.show{display:block}
+.setting-row{margin-bottom:12px}
+.setting-row:last-child{margin-bottom:0}
+.setting-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:4px}
+.setting-row select,.setting-row input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none}
+.setting-row input[type=range]{padding:0;height:24px;-webkit-appearance:none;background:transparent}
+.setting-row input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--border);border-radius:2px}
+.setting-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;background:var(--accent);border-radius:50%;margin-top:-5px}
+.setting-val{font-size:10px;color:var(--text3);float:right}
 </style>
 </head>
 <body>
 <a href="/" id="back-btn">← 返回</a>
+<button id="settings-btn" onclick="toggleSettings()">⚙</button>
+<div id="settings-panel">
+  <div class="setting-row">
+    <div class="setting-label">音色 Voice</div>
+    <select id="voice-sel" onchange="updateVoice()">
+      <option value="zh_female_vv_jupiter_bigtts">vv · 活泼灵动女声</option>
+      <option value="zh_female_xiaohe_jupiter_bigtts">xiaohe · 甜美女声</option>
+      <option value="zh_male_yunzhou_jupiter_bigtts">yunzhou · 清爽男声</option>
+      <option value="zh_male_xiaotian_jupiter_bigtts">xiaotian · 磁性男声</option>
+      <option value="en_female_dacey_uranus_bigtts">Dacey · 美式英语女声</option>
+      <option value="en_male_tim_uranus_bigtts">Tim · 美式英语男声</option>
+    </select>
+  </div>
+  <div class="setting-row">
+    <div class="setting-label">语速 Speed <span class="setting-val" id="speed-val">0.92x</span></div>
+    <input type="range" id="speed-slider" min="0.6" max="1.2" step="0.02" value="0.92" oninput="updateSpeed()">
+  </div>
+</div>
 <div id="app">
   <div id="status-icon">🎧</div>
   <div id="status-text">Ready</div>
@@ -153,7 +183,7 @@ function playNextChunk(){
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
     const source = playbackCtx.createBufferSource();
     source.buffer = buffer; source.connect(playbackCtx.destination);
-    source.playbackRate.value = 0.92;  // slightly slower for young learners
+    source.playbackRate.value = getPlaybackRate();
     source.onended = () => playNextChunk();
     source.start();
   } catch(e) { console.error('[voice] play err:', e); isPlaying = false; }
@@ -191,7 +221,53 @@ function updateUI(state){
   }
 }
 
-function setStatus(t){ document.getElementById('status-text').textContent = t; }
+// ─── Voice Settings ────────────────────────────────────
+
+let voiceSettings = {
+  speaker: localStorage.getItem('voice_speaker') || 'zh_female_vv_jupiter_bigtts',
+  speed: parseFloat(localStorage.getItem('voice_speed') || '0.92')
+};
+
+function initSettings(){
+  document.getElementById('voice-sel').value = voiceSettings.speaker;
+  document.getElementById('speed-slider').value = voiceSettings.speed;
+  document.getElementById('speed-val').textContent = voiceSettings.speed.toFixed(2) + 'x';
+}
+
+function toggleSettings(){
+  document.getElementById('settings-panel').classList.toggle('show');
+}
+
+function updateVoice(){
+  voiceSettings.speaker = document.getElementById('voice-sel').value;
+  localStorage.setItem('voice_speaker', voiceSettings.speaker);
+  // If in a call, send UpdateConfig to server
+  sendUpdateConfig();
+}
+
+function updateSpeed(){
+  voiceSettings.speed = parseFloat(document.getElementById('speed-slider').value);
+  document.getElementById('speed-val').textContent = voiceSettings.speed.toFixed(2) + 'x';
+  localStorage.setItem('voice_speed', voiceSettings.speed);
+  sendUpdateConfig();
+}
+
+function sendUpdateConfig(){
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'update_config',
+      speaker: voiceSettings.speaker,
+      speed: voiceSettings.speed
+    }));
+  }
+}
+
+// Apply speed to playback (used in playNextChunk)
+function getPlaybackRate(){ return voiceSettings.speed; }
+
+// Init on load
+initSettings();
+
 function startTimer(){
   timerInterval = setInterval(() => {
     const e = Math.floor((Date.now() - callStartTime) / 1000);
