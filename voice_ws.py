@@ -182,6 +182,12 @@ async def handle_voice(ws):
 
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
+
+        # Send initial greeting (like official demo's say_hello)
+        await volc_ws.send(build_text_frame(300, sid, {
+            "content": "Hello! Welcome to English speaking practice. How are you today?"
+        }))
+
         await ws.send_text(json.dumps({"type": "ready", "session_id": sid}))
         print(f"[voice] Ready!")
 
