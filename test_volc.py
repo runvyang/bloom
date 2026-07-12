@@ -30,6 +30,18 @@ async def main():
     print(f"session_id={sid} len={len(sb)}")
     print(f"payload len={len(pb)}")
 
+    # Try as text frame — volc might expect text opcode for binary protocol data
+    await ws.send(frame.decode('latin-1'))  # force text frame
+    raw = await asyncio.wait_for(ws.recv(), timeout=10)
+    mt = (raw[1] >> 4) & 0x0F
+    print(f"Response (text): {len(raw)} bytes, msg_type={mt}")
+    if mt != 0x0F:
+        print("TEXT FRAME WORKED!")
+        await ws.close()
+        return
+
+    # If text didn't work, try raw binary again for comparison
+    print("Text frame failed, trying binary again...")
     await ws.send(frame)
     raw = await asyncio.wait_for(ws.recv(), timeout=10)
     mt = (raw[1] >> 4) & 0x0F
