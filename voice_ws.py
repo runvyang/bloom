@@ -194,13 +194,17 @@ async def handle_voice(ws):
         seq = [0]
 
         async def browser_to_volc():
+            print(f"[voice] browser_to_volc relay started")
             while True:
                 try:
                     data = await ws.receive()
-                except Exception:
+                except Exception as e:
+                    print(f"[voice] browser_to_volc recv error: {e}")
                     break
                 if "bytes" in data:
-                    await volc_ws.send(build_audio_frame(session_id, data["bytes"], seq[0]))
+                    audio = data["bytes"]
+                    print(f"[voice] -> Volc audio: {len(audio)} bytes, seq={seq[0]}")
+                    await volc_ws.send(build_audio_frame(session_id, audio, seq[0]))
                     seq[0] += 1
                 elif "text" in data:
                     try:
@@ -212,6 +216,7 @@ async def handle_voice(ws):
                         pass
 
         async def volc_to_browser():
+            print(f"[voice] volc_to_browser relay started")
             while True:
                 try:
                     raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
@@ -227,6 +232,7 @@ async def handle_voice(ws):
 
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
+                    print(f"[voice] <- Volc ASR: {text}")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
                 elif eid == 550:  # Chat text
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
