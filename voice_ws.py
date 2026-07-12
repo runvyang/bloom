@@ -1,241 +1,174 @@
 """
-WebSocket proxy between browser and Volcengine real-time voice API.
-
-Browser <--ws (FastAPI)--> This Server <--ws (binary protocol)--> Volcengine API
+WebSocket proxy: Browser <--FastAPI WS--> Server <--raw WS--> Volcengine
+Uses manual WebSocket framing for Volcengine (matching working test_volc.py).
 """
-import asyncio
-import json
-import os
-import struct
-import uuid
-import traceback
-import websockets
+import asyncio, ssl, struct, json, uuid, os, base64, traceback
 from auth import validate_session
 
 VOLC_APP_ID = os.getenv("VOLC_APP_ID", "")
 VOLC_ACCESS_KEY = os.getenv("VOLC_ACCESS_KEY", "")
-VOLC_API_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
-VOLC_RESOURCE_ID = "volc.speech.dialog"
+VOLC_HOST = "openspeech.bytedance.com"
+VOLC_PATH = "/api/v3/realtime/dialogue"
 VOLC_APP_KEY = os.getenv("VOLC_APP_KEY", "")
 
+# ─── Raw WebSocket helpers (match test_volc.py exactly) ───
 
-def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
-    """Build text frame. For Connect events (1,2), session_id is ignored (no sid field).
-    For Session events (100,102,300,etc), session_id is included."""
-    payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    header = bytes([0x11, 0x14, 0x10, 0x00])
-    event_bytes = struct.pack(">I", event_id)
+def ws_frame(data: bytes, opcode: int = 0x2) -> bytes:
+    length = len(data); mask = os.urandom(4)
+    b0 = 0x80 | opcode
+    if length < 126: header = bytes([b0, 0x80 | length])
+    elif length < 65536: header = bytes([b0, 0x80 | 126]) + struct.pack(">H", length)
+    else: header = bytes([b0, 0x80 | 127]) + struct.pack(">Q", length)
+    return header + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data))
 
-    # Connect events (1,2) have NO session_id per doc example
-    if event_id in (1, 2):
-        payload_size_bytes = struct.pack(">I", len(payload_bytes))
-        return header + event_bytes + payload_size_bytes + payload_bytes
+async def ws_read(reader):
+    hdr = await reader.readexactly(2)
+    plen = hdr[1] & 0x7F
+    if plen == 126: plen = struct.unpack(">H", await reader.readexactly(2))[0]
+    elif plen == 127: plen = struct.unpack(">Q", await reader.readexactly(8))[0]
+    mk = await reader.readexactly(4) if (hdr[1] & 0x80) else b""
+    payload = await reader.readexactly(plen)
+    return bytes(b ^ mk[i % 4] for i, b in enumerate(payload)) if mk else payload
 
-    sid_bytes = session_id.encode("utf-8")
-    sid_size_bytes = struct.pack(">I", len(sid_bytes))
-    payload_size_bytes = struct.pack(">I", len(payload_bytes))
-    return header + event_bytes + sid_size_bytes + sid_bytes + payload_size_bytes + payload_bytes
+# ─── Volc binary protocol ───
 
+def build_text(event_id: int, sid: str, payload: dict) -> bytes:
+    pb = json.dumps(payload, ensure_ascii=False).encode(); sb = sid.encode()
+    return (bytes([0x11, 0x14, 0x10, 0x00]) + struct.pack(">I", event_id) +
+            struct.pack(">I", len(sb)) + sb + struct.pack(">I", len(pb)) + pb)
 
-def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
-    # Audio-only (msg_type=2), no event, no session_id — just raw audio payload
-    return (bytes([0x11, 0x20, 0x00, 0x00]) +
-            struct.pack(">I", len(audio_data)) + audio_data)
-
+def build_audio(audio_data: bytes) -> bytes:
+    return bytes([0x11, 0x20, 0x00, 0x00]) + struct.pack(">I", len(audio_data)) + audio_data
 
 def parse_frame(data: bytes):
-    if len(data) < 4:
-        return None
-    msg_type = (data[1] >> 4) & 0x0F
-    flags = data[1] & 0x0F
-    offset = 4
-
-    # Error frames (msg_type=0x0F): code(4) then payload_size+payload
-    error_code = None
-    if msg_type == 0x0F and len(data) >= offset + 4:
-        error_code = struct.unpack(">I", data[offset:offset + 4])[0]
-        offset += 4
-        payload = None
-        if len(data) >= offset + 4:
-            payload_size = struct.unpack(">I", data[offset:offset + 4])[0]
-            offset += 4
-            if payload_size > 0 and len(data) >= offset + payload_size:
-                payload = data[offset:offset + payload_size]
-        result = {"type": msg_type, "error_code": error_code}
-        if payload:
-            try:
-                result["json"] = json.loads(payload.decode("utf-8"))
-            except Exception:
-                result["text"] = payload.decode("utf-8", errors="replace")
-        return result
-
-    has_event = (flags & 0x04) != 0
-    event_id = None
-    if has_event and len(data) >= offset + 4:
-        event_id = struct.unpack(">I", data[offset:offset + 4])[0]
-        offset += 4
-    if len(data) >= offset + 4:
-        sid_size = struct.unpack(">I", data[offset:offset + 4])[0]
-        offset += 4
-        if sid_size > 0 and len(data) >= offset + sid_size:
-            offset += sid_size
-    payload = None
-    if len(data) >= offset + 4:
-        payload_size = struct.unpack(">I", data[offset:offset + 4])[0]
-        offset += 4
-        if payload_size > 0 and len(data) >= offset + payload_size:
-            payload = data[offset:offset + payload_size]
-    result = {"type": msg_type, "event_id": event_id}
+    if len(data) < 4: return None
+    mt = (data[1] >> 4) & 0x0F; flags = data[1] & 0x0F; off = 4
+    if mt == 0x0F:
+        code = struct.unpack(">I", data[off:off+4])[0]; off += 4
+        psize = struct.unpack(">I", data[off:off+4])[0]; off += 4
+        return {"type": mt, "error_code": code, "json": json.loads(data[off:off+psize].decode())}
+    eid = None
+    if (flags & 0x04) and len(data) >= off + 4:
+        eid = struct.unpack(">I", data[off:off+4])[0]; off += 4
+    if len(data) >= off + 4:
+        ssz = struct.unpack(">I", data[off:off+4])[0]; off += 4
+        if ssz > 0 and len(data) >= off + ssz: off += ssz
+    psize = struct.unpack(">I", data[off:off+4])[0]; off += 4
+    payload = data[off:off+psize]
+    result = {"type": mt, "event_id": eid}
     if payload:
-        if msg_type in (0x09, 0x01):
-            try:
-                result["json"] = json.loads(payload.decode("utf-8"))
-            except Exception:
-                result["text"] = payload.decode("utf-8", errors="replace")
-        elif msg_type == 0x0B:
-            result["audio"] = payload
+        if mt in (0x09, 0x01):
+            try: result["json"] = json.loads(payload.decode())
+            except: result["text"] = payload.decode(errors="replace")
+        elif mt == 0x0B: result["audio"] = payload
     return result
 
-
-def get_oral_english_prompt() -> str:
+def get_prompt() -> str:
     path = "courses/oral_english/world_model.md"
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()[:500]
-    return "You are an English teacher helping a student practice spoken English."
+        with open(path, "r", encoding="utf-8") as f: return f.read()[:500]
+    return "You are an English teacher."
 
+# ─── Main handler ───
 
 async def handle_voice(ws):
-    """Handle browser WebSocket. ws is FastAPI WebSocket (already accepted)."""
     token = ws.query_params.get("token", "")
     print(f"[voice] token={token[:20] if token else 'MISSING'}...")
 
     if not token:
-        await ws.send_text(json.dumps({"type": "error", "message": "Missing token"}))
-        await ws.close()
-        return
+        await ws.send_text(json.dumps({"type": "error", "message": "Missing token"})); await ws.close(); return
 
     user = validate_session(token)
-    print(f"[voice] user={user}")
     if not user:
-        await ws.send_text(json.dumps({"type": "error", "message": "Invalid token"}))
-        await ws.close()
-        return
+        await ws.send_text(json.dumps({"type": "error", "message": "Invalid token"})); await ws.close(); return
 
-    username = user["username"]
-    session_id = str(uuid.uuid4())
-    volc_ws = None
-    print(f"[voice] {username} connected, connecting to Volcengine...")
+    username = user["username"]; sid = str(uuid.uuid4())
+    reader = writer = None
+    print(f"[voice] {username} connecting to Volcengine...")
 
     try:
-        headers = {
-            "X-Api-App-ID": VOLC_APP_ID,
-            "X-Api-Access-Key": VOLC_ACCESS_KEY,
-            "X-Api-Resource-Id": VOLC_RESOURCE_ID,
-            "X-Api-App-Key": VOLC_APP_KEY,
-        }
-        print(f"[voice] Volc headers: APP_ID={VOLC_APP_ID}, ACCESS_KEY={VOLC_ACCESS_KEY[:8]}..., RESOURCE={VOLC_RESOURCE_ID}, APP_KEY={VOLC_APP_KEY[:8]}...")
-        volc_ws = await websockets.connect(VOLC_API_URL, additional_headers=headers,
-                                            compression=None, ping_interval=None)
-        print(f"[voice] Volcengine WS connected, starting session...")
+        # Manual WebSocket to Volcengine (matching test_volc.py exactly)
+        ws_key = base64.b64encode(os.urandom(16)).decode()
+        request = (
+            f"GET {VOLC_PATH} HTTP/1.1\r\nHost: {VOLC_HOST}\r\n"
+            f"Upgrade: websocket\r\nConnection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {ws_key}\r\nSec-WebSocket-Version: 13\r\n"
+            f"X-Api-App-ID: {VOLC_APP_ID}\r\n"
+            f"X-Api-Access-Key: {VOLC_ACCESS_KEY}\r\n"
+            f"X-Api-Resource-Id: volc.speech.dialog\r\n"
+            f"X-Api-App-Key: {VOLC_APP_KEY}\r\n\r\n"
+        ).encode()
+        reader, writer = await asyncio.open_connection(VOLC_HOST, 443, ssl=ssl.create_default_context())
+        writer.write(request); await writer.drain()
+        resp = b""
+        while b"\r\n\r\n" not in resp: resp += await reader.read(4096)
+        if b"101" not in resp:
+            print(f"[voice] Volc upgrade failed!"); return
+        print(f"[voice] Volcengine connected")
 
-        # Start directly with StartSession (WebSocket connect = Connection)
-        # per docs: "客户端发送StartSession事件初始化会话"
-        ss_payload = {
-            "asr": {
-                "audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1},
-                "extra": {}
-            },
-            "dialog": {
-                "bot_name": "Teacher",
-                "system_role": "You are an English teacher.",
-                "speaking_style": "friendly",
-                "extra": {"model": "1.2.1.1"}
-            },
-            "tts": {
-                "speaker": "zh_female_vv_jupiter_bigtts",
-                "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000},
-                "extra": {}
-            }
-        }
-        print(f"[voice] -> StartSession payload: {json.dumps(ss_payload, ensure_ascii=False)[:100]}...")
-        await volc_ws.send(build_text_frame(100, session_id, ss_payload))
+        # StartSession
+        writer.write(ws_frame(build_text(100, sid, {
+            "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
+            "dialog": {"bot_name": "Teacher", "system_role": get_prompt(),
+                       "speaking_style": "friendly", "extra": {"model": "1.2.1.1"}},
+            "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
+                    "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
+        }))); await writer.drain()
 
-        # Step 1: Wait for SessionStarted
-        raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
-        frame = parse_frame(raw)
-        if not frame or frame.get("event_id") != 150:
-            print(f"[voice] SessionStart failed: {frame}")
-            return
-        print(f"[voice] Volc session started")
+        raw = await ws_read(reader)
+        f = parse_frame(raw)
+        if not f or f.get("event_id") != 150:
+            print(f"[voice] SessionStart failed: {f}"); return
+        print(f"[voice] Session started")
 
-        # Step 2: Send text query to warm up session (matching working test_volc.py flow)
-        await volc_ws.send(build_text_frame(501, session_id, {
-            "content": "Hello! Please greet the student briefly."
-        }))
-        print(f"[voice] Sent warm-up text query, waiting for response...")
+        # Warm-up: text query (matching test_volc.py)
+        writer.write(ws_frame(build_text(501, sid, {"content": "Hello! Greet the student briefly."})))
+        await writer.drain()
 
-        # Drain ALL greeting responses (TTS audio + text + ended events)
+        # Drain response completely
         drained = 0
         while True:
             try:
-                raw = await asyncio.wait_for(volc_ws.recv(), timeout=0.5)
-                frame = parse_frame(raw)
-                if frame and frame.get("audio"):
-                    await ws.send_bytes(frame["audio"])
-                    drained += 1
-                elif frame:
-                    eid = frame.get("event_id")
-                    if eid in (359, 559):
-                        drained += 1
+                raw = await asyncio.wait_for(ws_read(reader), timeout=0.5)
+                f = parse_frame(raw)
+                if f:
+                    if f.get("audio"): await ws.send_bytes(f["audio"]); drained += 1
+                    elif f.get("event_id") in (359, 559): drained += 1
             except asyncio.TimeoutError:
-                break  # No more data — drain complete
-        print(f"[voice] Drained {drained} greeting responses, starting relay...")
+                break
+        print(f"[voice] Drained {drained}, starting relay...")
 
-        # Step 3: Start relay NOW that session is warmed up
+        # Relay
         async def browser_to_volc():
-            print("[voice] b2v relay started, waiting for browser audio...")
             n = 0
             while True:
                 try: data = await ws.receive()
-                except Exception as e:
-                    print(f"[voice] b2v ended: {e}")
-                    break
+                except Exception: break
                 if "bytes" in data:
                     n += 1
-                    await volc_ws.send(build_audio_frame(session_id, data["bytes"]))
+                    writer.write(ws_frame(build_audio(data["bytes"])))
                     if n <= 3 or n % 100 == 0:
-                        print(f"[voice] b2v #{n}: {len(data['bytes'])} bytes sent to Volc")
+                        print(f"[voice] b2v #{n}: {len(data['bytes'])} bytes")
                 elif "text" in data:
-                    print(f"[voice] b2v text: {data['text'][:100]}")
                     try:
                         if json.loads(data["text"]).get("type") == "end_session":
-                            await volc_ws.send(build_text_frame(102, session_id, {}))
-                            break
-                    except Exception: pass
+                            writer.write(ws_frame(build_text(102, sid, {}))); break
+                    except: pass
 
         async def volc_to_browser():
-            print("[voice] v2b relay started, waiting for Volc responses...")
             n = 0
             while True:
-                try: raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
+                try: raw = await asyncio.wait_for(ws_read(reader), timeout=60)
                 except asyncio.TimeoutError: continue
-                except Exception as e:
-                    print(f"[voice] v2b ended: {e}")
-                    break
-                frame = parse_frame(raw)
-                if not frame: continue
-                n += 1
-                eid = frame.get("event_id")
-                p = frame.get("json") or {}
-                has_audio = frame.get("audio") is not None
-                mt = frame.get("type")
+                except Exception: break
+                f = parse_frame(raw)
+                if not f: continue
+                n += 1; eid = f.get("event_id"); p = f.get("json") or {}
+                if n <= 3 or n % 50 == 0:
+                    print(f"[voice] v2b #{n}: eid={eid}, audio={'audio' in f}")
 
-                if n <= 5 or n % 20 == 0:
-                    print(f"[voice] v2b #{n}: type={mt}, eid={eid}, audio={has_audio}, json={json.dumps(p, ensure_ascii=False)[:80]}")
-
-                if has_audio:
-                    await ws.send_bytes(frame["audio"])
+                if f.get("audio"):
+                    await ws.send_bytes(f["audio"])
                 elif eid == 451:
                     text = (p.get("results") or [{}])[0].get("text", "")
                     print(f"[voice] ASR: {text}")
@@ -244,33 +177,22 @@ async def handle_voice(ws):
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
                 elif eid == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 359:
-                    await ws.send_text(json.dumps({"type": "tts_ended"}))
 
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
-
-        await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
-        print(f"[voice] Ready — start speaking!")
+        await ws.send_text(json.dumps({"type": "ready", "session_id": sid}))
+        print(f"[voice] Ready!")
 
         done, pending = await asyncio.wait([b2v, v2b], return_when=asyncio.FIRST_COMPLETED)
-        for t in pending:
-            t.cancel()
+        for t in pending: t.cancel()
 
-    except websockets.exceptions.ConnectionClosed as e:
-        print(f"[voice] Volcengine closed: code={e.code}, reason={e.reason}")
     except Exception as e:
         print(f"[voice] Error: {type(e).__name__}: {e}")
         traceback.print_exc()
-        try:
-            await ws.send_text(json.dumps({"type": "error", "message": str(e)}))
-        except Exception:
-            pass
+        try: await ws.send_text(json.dumps({"type": "error", "message": str(e)}))
+        except: pass
     finally:
-        if volc_ws:
-            try:
-                await volc_ws.send(build_text_frame(102, session_id, {}))
-                await volc_ws.close()
-            except Exception:
-                pass
+        if writer:
+            try: writer.write(ws_frame(build_text(102, sid, {}))); writer.close()
+            except: pass
         print(f"[voice] {username} disconnected")
