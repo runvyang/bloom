@@ -25,11 +25,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .trans-line.student{align-self:flex-start;background:var(--surface2);border-radius:12px 12px 12px 2px}
 .trans-line.streaming{opacity:.7}
 @keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-#back-btn{position:fixed;top:16px;left:16px;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none}
-#back-btn:hover{color:var(--text)}
-#settings-btn{position:fixed;top:16px;right:16px;width:36px;height:36px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
-#settings-btn:hover{color:var(--text)}
-#settings-panel{position:fixed;top:56px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;width:240px;display:none;z-index:100}
+#settings-panel{position:fixed;top:48px;right:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;width:240px;display:none;z-index:100}
 #settings-panel.show{display:block}
 .setting-row{margin-bottom:12px}
 .setting-row:last-child{margin-bottom:0}
@@ -42,8 +38,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 </style>
 </head>
 <body>
-<a href="/" id="back-btn">← 返回</a>
-<button id="settings-btn" onclick="toggleSettings()">⚙</button>
 <div id="settings-panel">
   <div class="setting-row">
     <div class="setting-label">音色 Voice</div>
@@ -63,11 +57,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 </div>
 <div id="app">
   <div id="top-bar">
+    <a href="/" style="color:var(--text2);text-decoration:none;font-size:13px">←</a>
     <div id="status-icon">🎧</div>
     <span id="status-text">就绪</span>
     <span id="timer">00:00</span>
     <span style="flex:1"></span>
     <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
+    <button id="settings-btn" onclick="toggleSettings()" style="position:static;width:28px;height:28px;font-size:14px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text3);cursor:pointer">⚙</button>
   </div>
   <div id="transcript"></div>
 </div>
