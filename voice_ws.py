@@ -144,21 +144,26 @@ async def handle_voice(ws):
         # Start directly with StartSession (WebSocket connect = Connection)
         # per docs: "客户端发送StartSession事件初始化会话"
         ss_payload = {
-            "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}},
+            "asr": {
+                "audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1},
+                "extra": {}
+            },
             "dialog": {
                 "bot_name": "Teacher",
                 "system_role": "You are an English teacher.",
-                "speaking_style": "friendly, patient",
+                "speaking_style": "friendly",
                 "extra": {"model": "1.2.1.1"}
             },
             "tts": {
                 "speaker": "zh_female_vv_jupiter_bigtts",
-                "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}
+                "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000},
+                "extra": {}
             }
         }
         print(f"[voice] -> StartSession payload: {json.dumps(ss_payload, ensure_ascii=False)[:100]}...")
         ss_frame = build_text_frame(100, session_id, ss_payload)
-        print(f"[voice] -> StartSession ({len(ss_frame)} bytes)")
+        print(f"[voice] -> StartSession ({len(ss_frame)} bytes), hex: {ss_frame[:40].hex()}...")
+        print(f"[voice] -> session_id={session_id}, sid_len={len(session_id)}")
         await volc_ws.send(ss_frame)
 
         # Wait for SessionStarted (event 150)
