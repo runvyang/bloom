@@ -1,5 +1,5 @@
-"""Audio frame format test — try different Audio-only (msg_type=0x02) variants."""
-import asyncio, ssl, struct, json, uuid, os, base64, math
+"""End-to-end audio test: send sine wave, receive TTS, save to file."""
+import asyncio, ssl, struct, json, uuid, os, base64, math, wave
 
 def ws_frame(data: bytes, opcode: int = 0x2) -> bytes:
     length = len(data)
@@ -24,6 +24,10 @@ def build_text(event_id: int, sid: str, payload: dict) -> bytes:
     return (bytes([0x11, 0x14, 0x10, 0x00]) + struct.pack(">I", event_id) +
             struct.pack(">I", len(sb)) + sb + struct.pack(">I", len(pb)) + pb)
 
+def build_audio(audio_data: bytes) -> bytes:
+    """Audio-only, Raw serialization, no event/sid/seq."""
+    return bytes([0x11, 0x20, 0x00, 0x00]) + struct.pack(">I", len(audio_data)) + audio_data
+
 def parse_frame(data: bytes):
     if len(data) < 4: return None
     mt = (data[1] >> 4) & 0x0F; flags = data[1] & 0x0F; off = 4
@@ -47,42 +51,17 @@ def parse_frame(data: bytes):
         elif mt == 0x0B: result["audio"] = payload
     return result
 
-async def do_test(reader, writer, name, frame):
-    print(f"\n--- {name} ---")
-    print(f"  hex: {frame[:20].hex()}...")
-    writer.write(ws_frame(frame))
-    try:
-        await asyncio.wait_for(writer.drain(), timeout=3)
-    except:
-        print("  ✗ Connection died on send!")
-        return False
-    try:
-        raw = await asyncio.wait_for(ws_read(reader), timeout=5)
-        f = parse_frame(raw)
-        if f:
-            eid = f.get('event_id')
-            if f.get('json'):
-                print(f"  ← event={eid}, json={json.dumps(f['json'], ensure_ascii=False)[:200]}")
-            elif f.get('audio'):
-                print(f"  ← AUDIO {len(f['audio'])} bytes ✓")
-            else:
-                print(f"  ← event={eid}, text={f.get('text','')[:100]}")
-            return f.get('event_id') not in (None,)
-        else:
-            print(f"  ← unparseable: {raw[:40].hex()}")
-            return True
-    except asyncio.TimeoutError:
-        print("  (timeout — server accepted?)")
-        return True
-    except:
-        print("  ✗ Connection lost!")
-        return False
-
-def make_audio(duration_ms=100, freq=440):
-    samples = int(16000 * duration_ms / 1000)
-    return struct.pack("<" + "h" * samples, *[
-        int(16000 * math.sin(2 * math.pi * freq * i / 16000)) for i in range(samples)
-    ])
+def make_speech_audio():
+    """Generate ~2 seconds of mock speech (varying frequencies to simulate voice)."""
+    samples = []
+    sample_rate = 16000
+    # Simulate "Hello?" with varying tones
+    freqs = [(300, 400), (350, 500), (200, 600), (250, 450)]  # (duration_ms, freq_hz)
+    for dur_ms, freq in freqs:
+        n = int(sample_rate * dur_ms / 1000)
+        for i in range(n):
+            samples.append(int(8000 * math.sin(2 * math.pi * freq * i / sample_rate)))
+    return struct.pack("<" + "h" * len(samples), *samples)
 
 async def main():
     host, path = "openspeech.bytedance.com", "/api/v3/realtime/dialogue"
@@ -101,66 +80,92 @@ async def main():
     resp = b""
     while b"\r\n\r\n" not in resp: resp += await reader.read(4096)
     if b"101" not in resp: print("Upgrade failed!"); return
-    print("Connected!")
+    print("✓ Connected!")
 
-    sid = str(uuid.uuid4()); sb = sid.encode()
+    sid = str(uuid.uuid4())
+
+    # StartSession
     writer.write(ws_frame(build_text(100, sid, {
         "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
         "dialog": {"bot_name": "test", "extra": {"model": "1.2.1.1"}},
-        "tts": {"speaker": "zh_female_vv_jupiter_bigtts", "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
+        "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
+                "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
     }))); await writer.drain()
+
     raw = await ws_read(reader)
     f = parse_frame(raw)
-    print(f"SessionStarted: event={f.get('event_id')}, {f.get('json')}")
+    if not f or f.get("event_id") != 150:
+        print(f"✗ SessionStart failed: {f}"); return
+    print(f"✓ Session started")
 
-    # Test FIRST: Simple text query — does chat work at all?
-    if not await do_test(reader, writer, "FIRST: Text query (event 501)",
-                         build_text(501, sid, {"content": "Hello, how are you?"})):
-        print("Even text query failed — something fundamentally wrong"); return
+    # Wait a beat, then send mock speech audio
+    await asyncio.sleep(0.5)
+    speech = make_speech_audio()
+    print(f"→ Sending audio: {len(speech)} bytes ({len(speech)/32:.0f}ms)")
 
-    # Read ALL responses until TTSEnded (359) or ChatEnded (559)
+    # Send 10 chunks of audio (like real mic streaming)
+    chunk_size = len(speech) // 10
     for i in range(10):
+        chunk = speech[i*chunk_size:(i+1)*chunk_size]
+        writer.write(ws_frame(build_audio(chunk)))
+        await asyncio.sleep(0.1)  # simulate 100ms between chunks
+
+    print(f"✓ Audio sent, waiting for response...")
+
+    # Collect all responses
+    all_audio = b""
+    all_text = ""
+    for i in range(30):
         try:
-            raw = await asyncio.wait_for(ws_read(reader), timeout=5)
+            raw = await asyncio.wait_for(ws_read(reader), timeout=3)
             f = parse_frame(raw)
-            if f:
-                eid = f.get('event_id')
-                if f.get('json') and f['json'].get('error'):
-                    print(f"  ← ERROR: {f['json']['error']}")
-                elif eid in (359, 559):  # TTSEnded or ChatEnded
-                    print(f"  ← event={eid} — text response complete")
-                    break
-                else:
-                    print(f"  ← event={eid}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
-                if f.get('audio'): print(f"  ← AUDIO: {len(f['audio'])} bytes!")
-        except asyncio.TimeoutError: break
-        except: break
+            if not f: continue
+            eid = f.get("event_id")
+            p = f.get("json") or {}
 
-    await asyncio.sleep(1)  # Let server settle
-    audio = make_audio(100, 440)
+            if p.get("error"):
+                print(f"  ← ERROR: {p['error']}")
+                continue
 
-    # Test A: Audio-only, flags=0x00 (no sequence, no event), just payload
-    frame_a = bytes([0x11, 0x20, 0x00, 0x00]) + struct.pack(">I", len(audio)) + audio
-    if not await do_test(reader, writer, "A: Audio-only, no flags, bare payload", frame_a):
-        print("Connection died — restart for more tests"); return
+            if f.get("audio"):
+                all_audio += f["audio"]
+                print(f"  ← TTS audio: {len(f['audio'])} bytes (total: {len(all_audio)})")
 
-    # Test B: Audio-only, flags=0x01 (has sequence=1), just seq+payload
-    frame_b = bytes([0x11, 0x21, 0x00, 0x00]) + struct.pack(">I", 1) + struct.pack(">I", len(audio)) + audio
-    if not await do_test(reader, writer, "B: Audio-only, seq=1, bare payload", frame_b):
-        return
+            if eid == 550:  # Chat text
+                text = p.get("content", "")
+                all_text += text
+                print(f"  ← Chat: {text}")
 
-    # Test C: Audio-only, flags=0x01 (seq=1), WITH session_id
-    frame_c = (bytes([0x11, 0x21, 0x00, 0x00]) + struct.pack(">I", 1) +
-               struct.pack(">I", len(sb)) + sb + struct.pack(">I", len(audio)) + audio)
-    if not await do_test(reader, writer, "C: Audio-only, seq=1 + session_id + audio", frame_c):
-        return
+            if eid == 451:  # ASR recognized
+                text = (p.get("results") or [{}])[0].get("text", "")
+                print(f"  ← ASR: {text}")
 
-    # Test D: Full-client event=200, but with JSON payload (text) not audio
-    frame_d = build_text(501, sid, {"content": "Hello, how are you?"})
-    if not await do_test(reader, writer, "D: Full-client text query (control test)", frame_d):
-        return
+            if eid in (359, 559):  # TTSEnded or ChatEnded
+                print(f"  ← Response complete (event {eid})")
+                break
+
+        except asyncio.TimeoutError:
+            print("  (timeout — no more data)")
+            break
+        except Exception as e:
+            print(f"  Connection error: {e}")
+            break
 
     writer.write(ws_frame(build_text(102, sid, {}))); await writer.drain()
-    writer.close(); print("\nDone!")
+    writer.close()
+
+    # Save audio
+    if all_audio:
+        fname = "/tmp/volc_tts.wav"
+        with wave.open(fname, "w") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)  # 16-bit
+            w.setframerate(24000)
+            w.writeframes(all_audio)
+        print(f"\n✓ TTS audio saved to {fname} ({len(all_audio)} bytes)")
+        print(f"  Play with: afplay {fname}")
+
+    if all_text:
+        print(f"✓ Response text: {all_text}")
 
 asyncio.run(main())
