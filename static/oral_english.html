@@ -134,10 +134,11 @@ function endCall(){
 let audioChunks = 0;
 function playAudio(arraybuffer){
   if (!playbackCtx || playbackCtx.state === 'closed') return;
+  if (playbackCtx.state === 'suspended') playbackCtx.resume();
   audioChunks++;
   try {
     const pcm = new Int16Array(arraybuffer);
-    if (audioChunks <= 3) console.log(`[voice] play audio #${audioChunks}: ${pcm.length} samples, first=[${pcm[0]},${pcm[1]},${pcm[2]}]`);
+    if (audioChunks <= 5) console.log(`[voice] play #${audioChunks}: ${pcm.length} samples, ctx=${playbackCtx.sampleRate}Hz, first=[${pcm[0]},${pcm[1]},${pcm[2]}]`);
     const buffer = playbackCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
