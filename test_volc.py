@@ -113,6 +113,22 @@ async def main():
     f = parse_frame(raw)
     print(f"SessionStarted: event={f.get('event_id')}, {f.get('json')}")
 
+    # Test FIRST: Simple text query — does chat work at all?
+    if not await do_test(reader, writer, "FIRST: Text query (event 501)",
+                         build_text(501, sid, {"content": "Hello, how are you?"})):
+        print("Even text query failed — something fundamentally wrong"); return
+
+    # Read a few responses to the text query
+    for i in range(5):
+        try:
+            raw = await asyncio.wait_for(ws_read(reader), timeout=5)
+            f = parse_frame(raw)
+            if f:
+                print(f"  ← event={f.get('event_id')}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
+                if f.get('audio'): print(f"  ← AUDIO {len(f['audio'])} bytes!")
+        except asyncio.TimeoutError: break
+        except: break
+
     audio = make_audio(100, 440)
 
     # Test A: Audio-only, flags=0x00 (no sequence, no event), just payload
