@@ -106,6 +106,11 @@ async function startCall(){
     const source = audioCtx.createMediaStreamSource(micStream);
     micNode = audioCtx.createScriptProcessor(4096, 1, 1);
     source.connect(micNode);
+    // Connect to destination with zero gain (required for onaudioprocess, prevents feedback)
+    const zeroGain = audioCtx.createGain();
+    zeroGain.gain.value = 0;
+    micNode.connect(zeroGain);
+    zeroGain.connect(audioCtx.destination);
 
     // Connect WebSocket
     const wsUrl = `${API.replace('http','ws')}/ws/voice/oral_english?token=${authToken}`;
