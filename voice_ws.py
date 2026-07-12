@@ -38,12 +38,8 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
 
 
 def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
-    # Full-client format with event 200 (TaskRequest), Raw serialization (NOT JSON)
-    # Verified working in test_volc.py after session warm-up
-    sb = session_id.encode()
-    return (bytes([0x11, 0x14, 0x00, 0x00]) +  # Full-client, has_event, Raw
-            struct.pack(">I", 200) +              # TaskRequest
-            struct.pack(">I", len(sb)) + sb +     # session_id
+    # Audio-only (msg_type=2), no event, no session_id — just raw audio payload
+    return (bytes([0x11, 0x20, 0x00, 0x00]) +
             struct.pack(">I", len(audio_data)) + audio_data)
 
 
@@ -178,22 +174,22 @@ async def handle_voice(ws):
         }))
         print(f"[voice] Sent greeting, waiting for response...")
 
-        # Drain greeting response completely before starting audio
-        for _ in range(20):
+        # Drain ALL greeting responses (TTS audio + text + ended events)
+        drained = 0
+        while True:
             try:
-                raw = await asyncio.wait_for(volc_ws.recv(), timeout=5)
+                raw = await asyncio.wait_for(volc_ws.recv(), timeout=0.5)
                 frame = parse_frame(raw)
-                eid = frame.get("event_id") if frame else None
                 if frame and frame.get("audio"):
-                    await ws.send_bytes(frame["audio"])  # Play greeting TTS
-                if eid in (359, 559):  # TTSEnded or ChatEnded
-                    print(f"[voice] Greeting response complete")
-                    break
+                    await ws.send_bytes(frame["audio"])
+                    drained += 1
+                elif frame:
+                    eid = frame.get("event_id")
+                    if eid in (359, 559):
+                        drained += 1
             except asyncio.TimeoutError:
-                break
-
-        await asyncio.sleep(1.0)  # Extra wait — let server fully settle
-        print(f"[voice] Starting audio relay now...")
+                break  # No more data — drain complete
+        print(f"[voice] Drained {drained} greeting responses, starting relay...")
 
         # Step 3: Start relay NOW that session is warmed up
         async def browser_to_volc():
