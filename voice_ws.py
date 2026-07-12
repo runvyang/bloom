@@ -26,12 +26,7 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
     header = bytes([0x11, 0x14, 0x10, 0x00])
     event_bytes = struct.pack("<I", event_id)
 
-    # Connect events (1=StartConnection, 2=FinishConnection) don't have session_id
-    if event_id in (1, 2):
-        payload_size_bytes = struct.pack("<I", len(payload_bytes))
-        return header + event_bytes + payload_size_bytes + payload_bytes
-
-    # Session events carry session_id
+    # All events carry session_id in V1 protocol
     sid_bytes = session_id.encode("utf-8")
     sid_size_bytes = struct.pack("<I", len(sid_bytes))
     payload_size_bytes = struct.pack("<I", len(payload_bytes))
@@ -150,7 +145,7 @@ async def handle_voice(ws):
         print(f"[voice] Waiting for Volcengine response...")
         try:
             raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
-            print(f"[voice] <- Volc raw ({len(raw)} bytes): {raw[:60].hex()}")
+            print(f"[voice] <- Volc raw ({len(raw)} bytes): {raw.hex()}")
             frame = parse_frame(raw)
             print(f"[voice] <- Volc frame: type={frame.get('type')}, event={frame.get('event_id')}")
             if frame.get("json"):
