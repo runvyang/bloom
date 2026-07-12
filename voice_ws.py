@@ -125,18 +125,30 @@ async def handle_voice(ws):
         writer.write(ws_frame(build_text(501, sid, {"content": "Hello! Greet the student briefly."})))
         await writer.drain()
 
-        # Drain response completely
+        # Drain ALL responses — wait for ChatEnded(559) or TTSEnded(359)
         drained = 0
-        while True:
+        ended = False
+        for _ in range(50):  # max 25 seconds
             try:
                 raw = await asyncio.wait_for(ws_read(reader), timeout=0.5)
                 f = parse_frame(raw)
                 if f:
                     if f.get("audio"): await ws.send_bytes(f["audio"]); drained += 1
-                    elif f.get("event_id") in (359, 559): drained += 1
+                    if f.get("event_id") in (359, 559): ended = True; drained += 1
+                    if ended:
+                        # Keep reading for 1 more second to get any trailing audio
+                        try:
+                            await asyncio.sleep(0.3)
+                            while True:
+                                raw2 = await asyncio.wait_for(ws_read(reader), timeout=0.3)
+                                f2 = parse_frame(raw2)
+                                if f2 and f2.get("audio"): await ws.send_bytes(f2["audio"]); drained += 1
+                        except asyncio.TimeoutError: pass
+                        break
             except asyncio.TimeoutError:
-                break
-        print(f"[voice] Drained {drained}, starting relay...")
+                if ended: break
+        await asyncio.sleep(2.0)  # Extra wait — let server fully settle
+        print(f"[voice] Drained {drained} (ended={ended}), starting relay...")
 
         # Relay
         async def browser_to_volc():
