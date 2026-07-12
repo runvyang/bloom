@@ -118,17 +118,25 @@ async def main():
                          build_text(501, sid, {"content": "Hello, how are you?"})):
         print("Even text query failed — something fundamentally wrong"); return
 
-    # Read a few responses to the text query
-    for i in range(5):
+    # Read ALL responses until TTSEnded (359) or ChatEnded (559)
+    for i in range(10):
         try:
             raw = await asyncio.wait_for(ws_read(reader), timeout=5)
             f = parse_frame(raw)
             if f:
-                print(f"  ← event={f.get('event_id')}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
-                if f.get('audio'): print(f"  ← AUDIO {len(f['audio'])} bytes!")
+                eid = f.get('event_id')
+                if f.get('json') and f['json'].get('error'):
+                    print(f"  ← ERROR: {f['json']['error']}")
+                elif eid in (359, 559):  # TTSEnded or ChatEnded
+                    print(f"  ← event={eid} — text response complete")
+                    break
+                else:
+                    print(f"  ← event={eid}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
+                if f.get('audio'): print(f"  ← AUDIO: {len(f['audio'])} bytes!")
         except asyncio.TimeoutError: break
         except: break
 
+    await asyncio.sleep(1)  # Let server settle
     audio = make_audio(100, 440)
 
     # Test A: Audio-only, flags=0x00 (no sequence, no event), just payload
