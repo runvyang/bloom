@@ -125,7 +125,7 @@ async def handle_voice(ws):
             "X-Api-App-ID": VOLC_APP_ID, "X-Api-Access-Key": VOLC_ACCESS_KEY,
             "X-Api-Resource-Id": "volc.speech.dialog", "X-Api-App-Key": VOLC_APP_KEY,
         }
-        volc_ws = await websockets.connect(VOLC_API_URL, extra_headers=headers, ping_interval=None)
+        volc_ws = await websockets.connect(VOLC_API_URL, additional_headers=headers, ping_interval=None)
         print(f"[voice] Volc connected")
 
         # StartConnection (matching official demo)
