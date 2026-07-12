@@ -19,6 +19,8 @@ VOLC_API_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
 VOLC_RESOURCE_ID = "volc.speech.dialog"
 VOLC_APP_KEY = os.getenv("VOLC_APP_KEY", "")
 
+print(f"app_id:{VOLC_APP_ID}, access_key: {VOLC_ACCESS_KEY}, app_key: {VOLC_APP_KEY}")
+
 # ─── Binary Protocol Helpers ─────────────────────────────
 
 def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
@@ -121,17 +123,26 @@ active_calls = {}  # username -> {"volc_ws": ws, "session_id": str}
 
 async def handle_voice(ws):
     """Handle a browser voice WebSocket connection."""
+    await ws.accept()
+
     # Parse token from query
     token = ws.query_params.get("token", "")
-    course = "oral_english"
+    print(f"[voice] token={token[:20]}...")
+
+    if not token:
+        await ws.send_text(json.dumps({"type": "error", "message": "Missing token"}))
+        await ws.close(4001)
+        return
 
     user = validate_session(token)
+    print(f"[voice] user={user}")
     if not user:
-        await ws.close(4001, "Invalid token")
+        await ws.send_text(json.dumps({"type": "error", "message": "Invalid or expired token"}))
+        await ws.close(4001)
         return
 
     username = user["username"]
-    print(f"[voice] {username} connected for {course}")
+    print(f"[voice] {username} connected for oral_english")
 
     session_id = str(uuid.uuid4())
     volc_ws = None
@@ -223,8 +234,8 @@ async def handle_voice(ws):
         # Run both directions concurrently
         await asyncio.gather(browser_to_volc(), volc_to_browser())
 
-    except websockets.exceptions.ConnectionClosed:
-        pass
+    except websockets.exceptions.ConnectionClosed as x:
+        print(f"[voice] conn closed: {x}")
     except Exception as e:
         print(f"[voice] Error: {e}")
         try:

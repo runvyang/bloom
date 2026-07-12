@@ -112,25 +112,40 @@ async function startCall(){
     ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
 
-    ws.onopen = () => {
-      isCalling = true;
-      callStartTime = Date.now();
-      updateUI('connected');
-      startTimer();
-    };
+    let wsReady = false;
+
+    ws.onopen = () => { /* wait for 'ready' message */ };
 
     ws.onmessage = (event) => {
       if (typeof event.data === 'string') {
         const msg = JSON.parse(event.data);
+        if (!wsReady) {
+          if (msg.type === 'ready' || msg.type === 'session_started') {
+            wsReady = true;
+            isCalling = true;
+            callStartTime = Date.now();
+            updateUI('connected');
+            startTimer();
+          } else if (msg.type === 'error') {
+            setStatus('连接失败: ' + msg.message);
+            ws.close();
+          }
+          return;
+        }
         handleMessage(msg);
       } else {
-        // Audio from server — play it
-        playAudio(event.data);
+        if (wsReady) playAudio(event.data);
       }
     };
 
-    ws.onerror = () => { endCall(); };
-    ws.onclose = () => { if (isCalling) endCall(); };
+    ws.onerror = () => {
+      if (!wsReady) setStatus('连接失败，请检查网络');
+      endCall();
+    };
+    ws.onclose = () => {
+      if (isCalling) endCall();
+      else if (!wsReady) setStatus('无法连接到语音服务');
+    };
 
     // Send mic audio to server
     micNode.onaudioprocess = (e) => {
@@ -139,19 +154,6 @@ async function startCall(){
       const pcm = floatToPCM16(input);
       ws.send(pcm);
     };
-
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('timeout')), 10000);
-      const handler = (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'ready' || msg.type === 'session_started') {
-          clearTimeout(timeout);
-          ws.removeEventListener('message', handler);
-          resolve();
-        }
-      };
-      ws.addEventListener('message', handler);
-    });
 
   } catch(e) {
     console.error('Call start error:', e);
