@@ -38,9 +38,12 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
 
 
 def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
-    # Audio-only (msg_type=2), Raw serialization, no event, no session_id, no sequence
-    # This is the format Volcengine actually accepts (verified by test_volc.py Test A)
-    return (bytes([0x11, 0x20, 0x00, 0x00]) +
+    # Full-client format with event 200 (TaskRequest), Raw serialization (NOT JSON)
+    # Verified working in test_volc.py after session warm-up
+    sb = session_id.encode()
+    return (bytes([0x11, 0x14, 0x00, 0x00]) +  # Full-client, has_event, Raw
+            struct.pack(">I", 200) +              # TaskRequest
+            struct.pack(">I", len(sb)) + sb +     # session_id
             struct.pack(">I", len(audio_data)) + audio_data)
 
 
@@ -188,6 +191,9 @@ async def handle_voice(ws):
                     break
             except asyncio.TimeoutError:
                 break
+
+        await asyncio.sleep(1.0)  # Extra wait — let server fully settle
+        print(f"[voice] Starting audio relay now...")
 
         # Step 3: Start relay NOW that session is warmed up
         async def browser_to_volc():
