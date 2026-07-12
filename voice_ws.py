@@ -191,12 +191,20 @@ async def handle_voice(ws):
 
         # Step 3: Start relay NOW that session is warmed up
         async def browser_to_volc():
+            print("[voice] b2v relay started, waiting for browser audio...")
+            n = 0
             while True:
                 try: data = await ws.receive()
-                except Exception: break
+                except Exception as e:
+                    print(f"[voice] b2v ended: {e}")
+                    break
                 if "bytes" in data:
+                    n += 1
                     await volc_ws.send(build_audio_frame(session_id, data["bytes"]))
+                    if n <= 3 or n % 100 == 0:
+                        print(f"[voice] b2v #{n}: {len(data['bytes'])} bytes sent to Volc")
                 elif "text" in data:
+                    print(f"[voice] b2v text: {data['text'][:100]}")
                     try:
                         if json.loads(data["text"]).get("type") == "end_session":
                             await volc_ws.send(build_text_frame(102, session_id, {}))
@@ -204,23 +212,30 @@ async def handle_voice(ws):
                     except Exception: pass
 
         async def volc_to_browser():
+            print("[voice] v2b relay started, waiting for Volc responses...")
+            n = 0
             while True:
                 try: raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
                 except asyncio.TimeoutError: continue
-                except Exception: break
+                except Exception as e:
+                    print(f"[voice] v2b ended: {e}")
+                    break
                 frame = parse_frame(raw)
                 if not frame: continue
+                n += 1
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
                 has_audio = frame.get("audio") is not None
-                if has_audio:
-                    print(f"[voice] <- TTS audio: {len(frame['audio'])} bytes")
-                    await ws.send_bytes(frame["audio"])
-                elif eid is not None:
-                    print(f"[voice] <- eid={eid}, json={json.dumps(p, ensure_ascii=False)[:100]}")
+                mt = frame.get("type")
 
-                if eid == 451:  # ASR
+                if n <= 5 or n % 20 == 0:
+                    print(f"[voice] v2b #{n}: type={mt}, eid={eid}, audio={has_audio}, json={json.dumps(p, ensure_ascii=False)[:80]}")
+
+                if has_audio:
+                    await ws.send_bytes(frame["audio"])
+                elif eid == 451:
                     text = (p.get("results") or [{}])[0].get("text", "")
+                    print(f"[voice] ASR: {text}")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
                 elif eid == 550:
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
