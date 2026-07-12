@@ -5,6 +5,9 @@ Key: ALL payloads MUST be gzip compressed with GZIP flag in header.
 import asyncio, struct, json, uuid, os, gzip, traceback
 import websockets
 from auth import validate_session
+from session_store import append_to_session
+from utils import read_file, append_file, copy_file
+from llm import OpenRouterClient
 
 VOLC_APP_ID = os.getenv("VOLC_APP_ID", "")
 VOLC_ACCESS_KEY = os.getenv("VOLC_ACCESS_KEY", "")
@@ -100,11 +103,30 @@ def parse_response(data: bytes):
     return result
 
 
-def get_prompt() -> str:
+def get_prompt(username: str = "") -> str:
+    """Build system prompt including student's current state."""
+    base = "You are a friendly English teacher helping a young Chinese student practice spoken English for the PET exam. Speak clearly at moderate speed. Encourage the student."
+
+    # Course prompt
     path = "courses/oral_english/world_model.md"
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f: return f.read()[:500]
-    return "You are an English teacher."
+        with open(path, "r", encoding="utf-8") as f:
+            base = f.read()[:400]
+
+    # Student state
+    if username:
+        state_path = f"data/student/{username}/oral_english_state.md"
+        template = "courses/oral_english/student_state.md"
+        if not os.path.exists(state_path) and os.path.exists(template):
+            copy_file(template, state_path)
+        if os.path.exists(state_path):
+            content = read_file(state_path)
+            # Extract the most relevant part (first 300 chars after header)
+            lines = content.split('\n')
+            body = '\n'.join(lines[10:]) if len(lines) > 10 else content
+            base += f"\n\nStudent's current level:\n{body[:400]}"
+
+    return base[:1000]
 
 # ─── Main handler ───
 
@@ -140,7 +162,7 @@ async def handle_voice(ws):
         # StartSession
         ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
-            "dialog": {"bot_name": "Teacher", "system_role": get_prompt(),
+            "dialog": {"bot_name": "Teacher", "system_role": get_prompt(username),
                        "speaking_style": "friendly", "extra": {"model": "1.2.1.1"}},
             "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
                     "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000,
@@ -151,6 +173,16 @@ async def handle_voice(ws):
         resp = await volc_ws.recv()
         r = parse_response(resp)
         print(f"[voice] StartSession: event={r.get('event')}")
+
+        # Track conversation for session log + eval
+        transcript = []  # list of {role, content}
+        last_teacher_text = [""]
+        last_student_text = [""]
+
+        def save_turn(role, text):
+            if text.strip():
+                transcript.append({"role": role, "content": text.strip()})
+                append_to_session(username, "oral_english", role, text.strip(), sid)
 
         # Relay
         async def browser_to_volc():
@@ -196,8 +228,18 @@ async def handle_voice(ws):
                             text = r["text"].strip()
                             print(f"[voice] ASR final: {text}")
                             await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
+                            nonlocal last_student_text
+                            if text != last_student_text[0]:
+                                last_student_text[0] = text
+                                save_turn("student", text)
                 elif evt == 550:
-                    await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
+                    content = p.get("content", "")
+                    last_teacher_text[0] += content
+                    await ws.send_text(json.dumps({"type": "chat_text", "content": content}, ensure_ascii=False))
+                elif evt == 359:  # TTS ended — flush teacher text
+                    if last_teacher_text[0].strip():
+                        save_turn("teacher", last_teacher_text[0])
+                        last_teacher_text[0] = ""
                 elif evt == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
 
@@ -222,4 +264,68 @@ async def handle_voice(ws):
         if volc_ws:
             try: await volc_ws.send(build_text_frame(102, sid, {})); await volc_ws.close()
             except: pass
+
+        # Run eval if we have conversation data
+        if transcript:
+            try:
+                await eval_conversation(username, transcript)
+            except Exception as e:
+                print(f"[voice] eval error: {e}")
+
         print(f"[voice] {username} disconnected")
+
+
+async def eval_conversation(username: str, transcript: list):
+    """After a voice call, evaluate progress and update student state."""
+    if len(transcript) < 2:
+        return
+
+    # Build eval prompt
+    convo_text = "\n".join([f"{'学生' if m['role']=='student' else '老师'}: {m['content'][:200]}" for m in transcript[-10:]])
+
+    state_path = f"data/student/{username}/oral_english_state.md"
+    template = "courses/oral_english/student_state.md"
+    if not os.path.exists(state_path) and os.path.exists(template):
+        copy_file(template, state_path)
+    current_state = read_file(state_path) if os.path.exists(state_path) else ""
+
+    prompt = f"""你是英语教学评估专家。根据以下口语课对话，评估学生的表现并更新学习状态。
+
+当前学生状态:
+{current_state[:1500]}
+
+本次口语课对话:
+{convo_text}
+
+请用 JSON 格式输出评估结果（只输出 JSON，不要其他文字）:
+{{
+  "observations": ["观察1", "观察2"],
+  "skills_updated": [
+    {{"skill": "技能名", "previous": "之前等级", "new": "新等级", "reason": "原因"}}
+  ],
+  "next_focus": "下次课应该重点练习什么",
+  "summary": "一句话总结本次课"
+}}"""
+
+    llm = OpenRouterClient()
+    try:
+        resp = llm.chat([{"role": "user", "content": prompt}], stream=False)
+        result = json.loads(resp.choices[0].message.content)
+
+        # Append eval to state file
+        summary = result.get("summary", "")
+        next_focus = result.get("next_focus", "")
+        updates = result.get("skills_updated", [])
+
+        delta = f"\n\n## 口语课评估 ({__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')})\n"
+        delta += f"**总结**: {summary}\n"
+        delta += f"**下次重点**: {next_focus}\n"
+        if updates:
+            delta += "\n**技能变化**:\n"
+            for u in updates:
+                delta += f"- {u['skill']}: {u['previous']} → {u['new']} ({u['reason']})\n"
+
+        append_file(state_path, delta)
+        print(f"[voice] Eval saved: {summary[:80]}")
+    except Exception as e:
+        print(f"[voice] Eval parse error: {e}")
