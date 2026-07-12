@@ -73,9 +73,9 @@ async def main():
     sb = sid.encode()
     pb = pld.encode()
     volc_frame = (bytes([0x11, 0x14, 0x10, 0x00]) +
-                  struct.pack("<I", 100) +
-                  struct.pack("<I", len(sb)) + sb +
-                  struct.pack("<I", len(pb)) + pb)
+                  struct.pack(">I", 100) +
+                  struct.pack(">I", len(sb)) + sb +
+                  struct.pack(">I", len(pb)) + pb)
     print(f"\nVolc frame: {len(volc_frame)} bytes")
     print(f"  header: {volc_frame[0:4].hex()}")
     print(f"  event=100: {volc_frame[4:8].hex()}")
@@ -94,9 +94,9 @@ async def main():
         print(f"  msg_type={mt}, hex[0:30]={payload[:30].hex()}")
         if mt == 0x0F and len(payload) >= 12:
             offset = 4
-            code = struct.unpack("<I", payload[offset:offset+4])[0]
+            code = struct.unpack(">I", payload[offset:offset+4])[0]
             offset += 4
-            psize = struct.unpack("<I", payload[offset:offset+4])[0]
+            psize = struct.unpack(">I", payload[offset:offset+4])[0]
             offset += 4
             err = payload[offset:offset+psize].decode()
             print(f"  ERROR code={code}, msg={err}")

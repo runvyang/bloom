@@ -24,25 +24,25 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
     For Session events (100,102,300,etc), session_id is included."""
     payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     header = bytes([0x11, 0x14, 0x10, 0x00])
-    event_bytes = struct.pack("<I", event_id)
+    event_bytes = struct.pack(">I", event_id)
 
     # Connect events (1,2) have NO session_id per doc example
     if event_id in (1, 2):
-        payload_size_bytes = struct.pack("<I", len(payload_bytes))
+        payload_size_bytes = struct.pack(">I", len(payload_bytes))
         return header + event_bytes + payload_size_bytes + payload_bytes
 
     sid_bytes = session_id.encode("utf-8")
-    sid_size_bytes = struct.pack("<I", len(sid_bytes))
-    payload_size_bytes = struct.pack("<I", len(payload_bytes))
+    sid_size_bytes = struct.pack(">I", len(sid_bytes))
+    payload_size_bytes = struct.pack(">I", len(payload_bytes))
     return header + event_bytes + sid_size_bytes + sid_bytes + payload_size_bytes + payload_bytes
 
 
 def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
     sid_bytes = session_id.encode("utf-8")
     header = bytes([0x11, 0x21, 0x10, 0x00])
-    seq_bytes = struct.pack("<I", sequence)
-    sid_size_bytes = struct.pack("<I", len(sid_bytes))
-    payload_size_bytes = struct.pack("<I", len(audio_data))
+    seq_bytes = struct.pack(">I", sequence)
+    sid_size_bytes = struct.pack(">I", len(sid_bytes))
+    payload_size_bytes = struct.pack(">I", len(audio_data))
     return header + seq_bytes + sid_size_bytes + sid_bytes + payload_size_bytes + audio_data
 
 
@@ -56,11 +56,11 @@ def parse_frame(data: bytes):
     # Error frames (msg_type=0x0F): code(4) then payload_size+payload
     error_code = None
     if msg_type == 0x0F and len(data) >= offset + 4:
-        error_code = struct.unpack("<I", data[offset:offset + 4])[0]
+        error_code = struct.unpack(">I", data[offset:offset + 4])[0]
         offset += 4
         payload = None
         if len(data) >= offset + 4:
-            payload_size = struct.unpack("<I", data[offset:offset + 4])[0]
+            payload_size = struct.unpack(">I", data[offset:offset + 4])[0]
             offset += 4
             if payload_size > 0 and len(data) >= offset + payload_size:
                 payload = data[offset:offset + payload_size]
@@ -75,16 +75,16 @@ def parse_frame(data: bytes):
     has_event = (flags & 0x04) != 0
     event_id = None
     if has_event and len(data) >= offset + 4:
-        event_id = struct.unpack("<I", data[offset:offset + 4])[0]
+        event_id = struct.unpack(">I", data[offset:offset + 4])[0]
         offset += 4
     if len(data) >= offset + 4:
-        sid_size = struct.unpack("<I", data[offset:offset + 4])[0]
+        sid_size = struct.unpack(">I", data[offset:offset + 4])[0]
         offset += 4
         if sid_size > 0 and len(data) >= offset + sid_size:
             offset += sid_size
     payload = None
     if len(data) >= offset + 4:
-        payload_size = struct.unpack("<I", data[offset:offset + 4])[0]
+        payload_size = struct.unpack(">I", data[offset:offset + 4])[0]
         offset += 4
         if payload_size > 0 and len(data) >= offset + payload_size:
             payload = data[offset:offset + payload_size]
