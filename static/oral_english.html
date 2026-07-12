@@ -1,61 +1,34 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Oral English - Voice Practice</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--surface3:#21223a;
-  --border:#252744;--accent:#6366f1;--accent-hi:#818cf8;--text:#dde0f2;
-  --text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;
-  --sans:system-ui,-apple-system,sans-serif;
-}
+:root{--bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--border:#252744;--accent:#6366f1;--text:#dde0f2;--text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;--sans:system-ui,sans-serif}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
 #app{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:40px 20px}
-
-/* Status */
 #status-icon{font-size:64px;transition:transform .3s}
 #status-icon.ringing{animation:pulse-icon 1s infinite}
 @keyframes pulse-icon{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
 #status-text{font-size:16px;color:var(--text2);text-align:center;min-height:24px}
 #timer{font-family:monospace;font-size:24px;color:var(--accent);display:none}
-
-/* Call button */
-#call-btn{
-  width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;
-  font-size:32px;transition:all .2s;display:flex;align-items:center;justify-content:center;
-}
+#user-text{font-size:14px;color:var(--accent-hi);text-align:center;min-height:20px;max-width:500px;line-height:1.5}
+#call-btn{width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;font-size:32px;transition:all .2s;display:flex;align-items:center;justify-content:center}
 #call-btn.start{background:var(--green);color:#fff}
-#call-btn.start:hover{transform:scale(1.08);box-shadow:0 0 24px rgba(74,222,128,.3)}
+#call-btn.start:hover{transform:scale(1.08)}
 #call-btn.end{background:var(--red);color:#fff}
-#call-btn.end:hover{transform:scale(1.08);box-shadow:0 0 24px rgba(248,113,113,.3)}
-
-/* User text (ASR) */
-#user-text{
-  font-size:14px;color:var(--accent-hi);text-align:center;
-  min-height:20px;max-width:500px;line-height:1.5;
-}
-
-/* Transcript */
-#transcript{
-  width:100%;max-width:600px;max-height:200px;overflow-y:auto;
-  display:flex;flex-direction:column;gap:8px;padding:8px;
-}
+#mic-btn{width:60px;height:60px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:24px;transition:all .15s;display:none}
+#mic-btn.recording{background:var(--red);color:#fff;border-color:var(--red);animation:pulse-mic .8s infinite}
+@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.4)}50%{box-shadow:0 0 0 12px rgba(248,113,113,0)}}
+#transcript{width:100%;max-width:600px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px}
 #transcript::-webkit-scrollbar{width:3px}
 #transcript::-webkit-scrollbar-thumb{background:var(--border)}
 .trans-line{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;animation:fade-in .3s}
-.trans-line.teacher{background:var(--surface);border-left:3px solid var(--green);align-self:flex-start}
-.trans-line.student{background:var(--surface2);border-left:3px solid var(--accent);align-self:flex-end}
+.trans-line.teacher{background:var(--surface);border-left:3px solid var(--green)}
+.trans-line.student{background:var(--surface2);border-left:3px solid var(--accent)}
 @keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-
-/* Back button */
-#back-btn{
-  position:fixed;top:16px;left:16px;padding:8px 14px;
-  background:var(--surface);border:1px solid var(--border);border-radius:8px;
-  color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none;
-}
+#back-btn{position:fixed;top:16px;left:16px;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none}
 #back-btn:hover{color:var(--text)}
 </style>
 </head>
@@ -63,82 +36,51 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 <a href="/" id="back-btn">← 返回</a>
 <div id="app">
   <div id="status-icon">🎧</div>
-  <div id="status-text">Ready to practice speaking</div>
+  <div id="status-text">Ready</div>
   <div id="timer">00:00</div>
   <div id="user-text"></div>
-  <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
+  <div style="display:flex;gap:16px;align-items:center">
+    <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
+    <button id="mic-btn" onmousedown="startSTT(event)" onmouseup="stopSTT()" onmouseleave="stopSTT()" ontouchstart="startSTT(event)" ontouchend="stopSTT()" title="按住说英语，松开发送">🎤</button>
+  </div>
   <div id="transcript"></div>
 </div>
 
 <script>
 const API = window.location.origin;
 let authToken = localStorage.getItem('auth_token');
-let ws = null;
-let audioCtx = null;
-let micStream = null;
-let micNode = null;
-let isCalling = false;
-let callStartTime = 0;
-let timerInterval = null;
+let ws = null, audioCtx = null, isCalling = false, callStartTime = 0, timerInterval = null;
+let sttRecognition = null, sttText = '';
 
-// Check auth
 (async function(){
-  if (!authToken) { window.location.href = '/'; return; }
+  if (!authToken) { location.href = '/'; return; }
   const r = await fetch(`${API}/auth/me`, { headers: { 'Authorization': `Bearer ${authToken}` } });
-  if (!r.ok) { window.location.href = '/'; return; }
+  if (!r.ok) { location.href = '/'; return; }
 })();
 
 async function toggleCall(){
-  if (isCalling) {
-    endCall();
-  } else {
-    await startCall();
-  }
+  if (isCalling) { endCall(); } else { await startCall(); }
 }
 
 async function startCall(){
   try {
-    // Init AudioContext
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-
-    // Get microphone (PCM 16kHz mono)
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true } });
-    const source = audioCtx.createMediaStreamSource(micStream);
-    micNode = audioCtx.createScriptProcessor(1024, 1, 1);  // ~64ms at 16kHz → 2048 bytes/packet
-    source.connect(micNode);
-    // Connect to destination with zero gain (required for onaudioprocess, prevents feedback)
-    const zeroGain = audioCtx.createGain();
-    zeroGain.gain.value = 0;
-    micNode.connect(zeroGain);
-    zeroGain.connect(audioCtx.destination);
-
-    // Connect WebSocket
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const wsUrl = `${API.replace('http','ws')}/ws/voice/oral_english?token=${authToken}`;
     ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
-
     let wsReady = false;
 
-    ws.onopen = () => { console.log('[voice] WS opened, waiting for ready...'); };
-
+    ws.onopen = () => console.log('[voice] WS opened');
     ws.onmessage = (event) => {
-      console.log('[voice] msg received:', typeof event.data, typeof event.data === 'string' ? event.data.slice(0,100) : '(binary)');
       if (typeof event.data === 'string') {
-        let msg;
-        try { msg = JSON.parse(event.data); } catch(e) { console.log('[voice] parse err:', e); return; }
-        console.log('[voice] parsed:', msg);
+        let msg; try { msg = JSON.parse(event.data) } catch(e) { return }
+        console.log('[voice] got:', msg.type, msg);
         if (!wsReady) {
-          if (msg.type === 'ready' || msg.type === 'session_started') {
-            wsReady = true;
-            isCalling = true;
-            callStartTime = Date.now();
-            updateUI('connected');
-            startTimer();
-            setStatus('已连接，可以开始说话');
-          } else if (msg.type === 'error') {
-            setStatus('连接失败: ' + msg.message);
-            ws.close();
-          }
+          if (msg.type === 'ready') {
+            wsReady = true; isCalling = true; callStartTime = Date.now();
+            updateUI('connected'); startTimer();
+            setStatus('按住 🎤 说英语，松开发送');
+          } else if (msg.type === 'error') { setStatus('失败: ' + msg.message); }
           return;
         }
         handleMessage(msg);
@@ -146,161 +88,112 @@ async function startCall(){
         if (wsReady) playAudio(event.data);
       }
     };
-
-    ws.onerror = () => {
-      if (!wsReady) setStatus('连接失败，请检查网络');
-      endCall();
-    };
-    ws.onclose = () => {
-      if (isCalling) endCall();
-      else if (!wsReady) setStatus('无法连接到语音服务');
-    };
-
-    // Send mic audio to server — with simple VAD (voice activity detection)
-    let silenceFrames = 0;
-    let totalFrames = 0;
-    const SILENCE_THRESHOLD = 0.005;  // RMS energy below this = silence (lowered for kids' voice)
-    const SILENCE_HANGOVER = 15;       // frames of silence before stopping (~1s)
-
-    micNode.onaudioprocess = (e) => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const input = e.inputBuffer.getChannelData(0);
-
-      // Calculate RMS energy
-      let sum = 0;
-      for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
-      const rms = Math.sqrt(sum / input.length);
-
-      totalFrames++;
-      if (totalFrames % 30 === 0) {
-        console.log('[voice] VAD rms=' + rms.toFixed(4) + ' silenceFrames=' + silenceFrames + ' sent=' + (silenceFrames < SILENCE_HANGOVER));
-        document.getElementById('user-text').textContent =
-          rms > SILENCE_THRESHOLD ? '🎤 检测到语音...' : (silenceFrames < SILENCE_HANGOVER ? '...' : '🔇 静音中');
-      }
-
-      if (!wsReady) return;  // Don't send audio until server says ready
-
-      if (rms > SILENCE_THRESHOLD) {
-        silenceFrames = 0;
-        ws.send(floatToPCM16(input));
-      } else if (silenceFrames < SILENCE_HANGOVER) {
-        silenceFrames++;
-        ws.send(floatToPCM16(input));
-      }
-    };
-
-  } catch(e) {
-    console.error('Call start error:', e);
-    setStatus('Microphone access needed for voice practice');
-    endCall();
-  }
+    ws.onerror = () => { endCall(); };
+    ws.onclose = () => { if (isCalling) endCall(); };
+  } catch(e) { console.error(e); setStatus('连接失败'); endCall(); }
 }
 
 function endCall(){
-  isCalling = false;
-  if (ws) {
-    try { ws.send(JSON.stringify({type:'end_session'})); } catch(e) {}
-    setTimeout(() => { try { ws.close(); } catch(e) {} }, 500);
-    ws = null;
-  }
-  if (micNode) { micNode.disconnect(); micNode = null; }
-  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  isCalling = false; stopSTT();
+  if (ws) { try { ws.close() } catch(e) {}; ws = null; }
   if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   updateUI('idle');
 }
 
-function handleMessage(msg){
-  console.log('[voice] browser got:', msg.type, msg);
-  switch(msg.type){
-    case 'ready':
-    case 'session_started':
-      setStatus('Connected! Start speaking...');
-      break;
-    case 'asr':
-      document.getElementById('user-text').textContent = msg.text || '';
-      if (msg.text) addTranscript('student', msg.text);
-      break;
-    case 'chat_text':
-      addTranscript('teacher', msg.content || '');
-      break;
-    case 'tts_start':
-      if (msg.text) addTranscript('teacher', msg.text);
-      break;
-    case 'error':
-      setStatus('Error: ' + msg.message);
-      break;
-  }
+// ─── STT ────────────────────────────────────────────────
+
+function initSTT(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  sttRecognition = new SR();
+  sttRecognition.lang = 'en-US';
+  sttRecognition.interimResults = true;
+  sttRecognition.continuous = true;
+  sttRecognition.onresult = (e) => {
+    let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+    sttText = t; document.getElementById('user-text').textContent = t;
+  };
+  sttRecognition.onerror = (e) => console.log('[stt] err:', e.error);
 }
+
+function startSTT(e){
+  e.preventDefault();
+  if (!sttRecognition) initSTT();
+  if (!sttRecognition) return;
+  sttText = ''; document.getElementById('user-text').textContent = '🎤 聆听中...';
+  try { sttRecognition.start() } catch(ex) {}
+  document.getElementById('mic-btn').classList.add('recording');
+  setStatus('正在聆听...松开发送', 'loading');
+}
+
+function stopSTT(){
+  if (!sttRecognition) return;
+  try { sttRecognition.stop() } catch(ex) {}
+  document.getElementById('mic-btn').classList.remove('recording');
+  setStatus('按住 🎤 说英语');
+  if (sttText.trim() && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type: 'text_query', content: sttText.trim()}));
+    addTranscript('student', sttText.trim());
+  }
+  sttText = '';
+}
+
+// ─── Audio playback ─────────────────────────────────────
 
 let audioChunks = 0;
 function playAudio(arraybuffer){
-  if (!audioCtx || audioCtx.state === 'closed') { console.log('[voice] audioCtx closed'); return; }
+  if (!audioCtx || audioCtx.state === 'closed') return;
   audioChunks++;
   try {
     const pcm = new Int16Array(arraybuffer);
-    if (audioChunks <= 3) console.log(`[voice] playing audio chunk #${audioChunks}: ${pcm.length} samples`);
+    if (audioChunks <= 3) console.log(`[voice] play audio #${audioChunks}: ${pcm.length} samples`);
     const buffer = audioCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
     const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
-    source.start();
-  } catch(e) { console.error('[voice] audio play error:', e); }
+    source.buffer = buffer; source.connect(audioCtx.destination); source.start();
+  } catch(e) { console.error('[voice] play err:', e); }
 }
 
-function floatToPCM16(float32){
-  const buf = new ArrayBuffer(float32.length * 2);
-  const view = new DataView(buf);
-  for (let i = 0; i < float32.length; i++) {
-    let s = Math.max(-1, Math.min(1, float32[i]));
-    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-  }
-  return buf;
+// ─── UI ─────────────────────────────────────────────────
+
+function handleMessage(msg){
+  console.log('[voice] handle:', msg.type, msg);
+  if (msg.type === 'chat_text') addTranscript('teacher', msg.content || '');
+  if (msg.type === 'tts_start' && msg.text) addTranscript('teacher', msg.text);
+  if (msg.type === 'asr') { document.getElementById('user-text').textContent = msg.text || ''; if (msg.text) addTranscript('student', msg.text); }
 }
 
 function addTranscript(role, text){
   const el = document.getElementById('transcript');
   const line = document.createElement('div');
-  line.className = 'trans-line ' + role;
-  line.textContent = text;
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
+  line.className = 'trans-line ' + role; line.textContent = text;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
 }
 
 function updateUI(state){
   const icon = document.getElementById('status-icon');
-  const btn = document.getElementById('call-btn');
+  const callBtn = document.getElementById('call-btn');
+  const micBtn = document.getElementById('mic-btn');
   const timer = document.getElementById('timer');
-
   if (state === 'connected'){
-    icon.textContent = '🗣️';
-    icon.classList.add('ringing');
-    btn.className = 'end';
-    btn.textContent = '📞';
-    timer.style.display = 'block';
-    setStatus('Speaking practice in progress...');
+    icon.textContent = '🗣️'; icon.classList.add('ringing');
+    callBtn.className = 'end'; callBtn.textContent = '📞';
+    micBtn.style.display = ''; timer.style.display = 'block';
   } else {
-    icon.textContent = '🎧';
-    icon.classList.remove('ringing');
-    btn.className = 'start';
-    btn.textContent = '📞';
-    timer.style.display = 'none';
-    setStatus('Ready to practice speaking');
-    document.getElementById('user-text').textContent = '';
+    icon.textContent = '🎧'; icon.classList.remove('ringing');
+    callBtn.className = 'start'; callBtn.textContent = '📞';
+    micBtn.style.display = 'none'; timer.style.display = 'none';
+    setStatus('Ready'); document.getElementById('user-text').textContent = '';
   }
 }
 
-function setStatus(txt){ document.getElementById('status-text').textContent = txt; }
-
+function setStatus(t){ document.getElementById('status-text').textContent = t; }
 function startTimer(){
   timerInterval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
-    const min = Math.floor(elapsed / 60);
-    const sec = elapsed % 60;
-    document.getElementById('timer').textContent =
-      String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+    const e = Math.floor((Date.now() - callStartTime) / 1000);
+    document.getElementById('timer').textContent = String(Math.floor(e/60)).padStart(2,'0')+':'+String(e%60).padStart(2,'0');
   }, 1000);
 }
 </script>
