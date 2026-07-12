@@ -234,9 +234,7 @@ async def handle_voice(ws):
                 p = frame.get("json") or {}
 
                 # Log ALL events for debugging
-                print(f"[voice] <- Volc event={eid}, has_audio={'audio' in frame}, json_keys={list(p.keys()) if p else 'none'}")
-                if eid is None and frame.get('text'):
-                    print(f"[voice] <- Volc text: {frame['text'][:200]}")
+                print(f"[voice] <- Volc event={eid}, has_audio={'audio' in frame}, json={json.dumps(p, ensure_ascii=False)[:300]}")
 
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
