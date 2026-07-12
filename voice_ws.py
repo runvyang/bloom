@@ -121,22 +121,20 @@ active_calls = {}  # username -> {"volc_ws": ws, "session_id": str}
 
 async def handle_voice(ws):
     """Handle a browser voice WebSocket connection."""
-    await ws.accept()
-
     # Parse token from query
     token = ws.query_params.get("token", "")
-    print(f"[voice] token={token[:20]}...")
+    print(f"[voice] token={token[:20] if token else 'MISSING'}...")
 
     if not token:
         await ws.send_text(json.dumps({"type": "error", "message": "Missing token"}))
-        await ws.close(4001)
+        await ws.close()
         return
 
     user = validate_session(token)
     print(f"[voice] user={user}")
     if not user:
         await ws.send_text(json.dumps({"type": "error", "message": "Invalid or expired token"}))
-        await ws.close(4001)
+        await ws.close()
         return
 
     username = user["username"]
