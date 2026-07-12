@@ -234,11 +234,7 @@ async def handle_voice(ws):
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
 
-        # Send SayHello — TTS flows through already-running relay
-        await volc_ws.send(build_text_frame(300, session_id, {
-            "content": "Hello! Welcome to your English speaking practice. How are you today?"
-        }))
-
+        # No SayHello — let the student speak first. Server will ASR+TTS naturally.
         await ws.send_text(json.dumps({"type": "ready", "session_id": session_id}))
         print(f"[voice] Relay started (browser <-> Volcengine)")
 
