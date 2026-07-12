@@ -164,8 +164,8 @@ async def handle_voice(ws):
                 f = parse_frame(raw)
                 if not f: continue
                 n += 1; eid = f.get("event_id"); p = f.get("json") or {}
-                if n <= 3 or n % 50 == 0:
-                    print(f"[voice] v2b #{n}: eid={eid}, audio={'audio' in f}")
+                if n <= 5 or n % 50 == 0:
+                    print(f"[voice] v2b #{n}: type={f.get('type')}, eid={eid}, audio={'audio' in f}, json={json.dumps(p, ensure_ascii=False)[:100]}")
 
                 if f.get("audio"):
                     await ws.send_bytes(f["audio"])
