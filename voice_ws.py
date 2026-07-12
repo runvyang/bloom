@@ -109,7 +109,7 @@ async def handle_voice(ws):
             "X-Api-Resource-Id": VOLC_RESOURCE_ID,
             "X-Api-App-Key": VOLC_APP_KEY,
         }
-        volc_ws = await websockets.connect(VOLC_API_URL, extra_headers=headers)
+        volc_ws = await websockets.connect(VOLC_API_URL, additional_headers=headers)
         print(f"[voice] Volcengine WS connected, starting session...")
 
         # StartConnection
