@@ -21,16 +21,7 @@ from fastapi import WebSocket
 @app.websocket("/ws/voice/oral_english")
 async def ws_voice(ws: WebSocket):
     await ws.accept()
-    token = ws.query_params.get("token", "")
-    print(f"[voice-ws] connected, token={token[:20] if token else 'NONE'}")
-    await ws.send_text(json.dumps({"type": "ready", "msg": "test ok"}))
-    try:
-        while True:
-            data = await ws.receive_text()
-            print(f"[voice-ws] received: {data[:50]}")
-    except Exception:
-        pass
-    print("[voice-ws] disconnected")
+    await handle_voice(ws)
 
 # 初始化
 chat_runtime = ChatRuntime()
