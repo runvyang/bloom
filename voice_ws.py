@@ -20,10 +20,19 @@ VOLC_APP_KEY = os.getenv("VOLC_APP_KEY", "")
 
 
 def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
+    """Build text frame. For Connect events (1,2), session_id is ignored (no sid field).
+    For Session events (100,102,300,etc), session_id is included."""
     payload_bytes = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    sid_bytes = session_id.encode("utf-8")
     header = bytes([0x11, 0x14, 0x10, 0x00])
     event_bytes = struct.pack("<I", event_id)
+
+    # Connect events (1=StartConnection, 2=FinishConnection) don't have session_id
+    if event_id in (1, 2):
+        payload_size_bytes = struct.pack("<I", len(payload_bytes))
+        return header + event_bytes + payload_size_bytes + payload_bytes
+
+    # Session events carry session_id
+    sid_bytes = session_id.encode("utf-8")
     sid_size_bytes = struct.pack("<I", len(sid_bytes))
     payload_size_bytes = struct.pack("<I", len(payload_bytes))
     return header + event_bytes + sid_size_bytes + sid_bytes + payload_size_bytes + payload_bytes
