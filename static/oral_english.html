@@ -211,6 +211,7 @@ function endCall(){
 }
 
 function handleMessage(msg){
+  console.log('[voice] browser got:', msg.type, msg);
   switch(msg.type){
     case 'ready':
     case 'session_started':
@@ -232,10 +233,13 @@ function handleMessage(msg){
   }
 }
 
+let audioChunks = 0;
 function playAudio(arraybuffer){
-  if (!audioCtx || audioCtx.state === 'closed') return;
+  if (!audioCtx || audioCtx.state === 'closed') { console.log('[voice] audioCtx closed'); return; }
+  audioChunks++;
   try {
     const pcm = new Int16Array(arraybuffer);
+    if (audioChunks <= 3) console.log(`[voice] playing audio chunk #${audioChunks}: ${pcm.length} samples`);
     const buffer = audioCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
@@ -243,7 +247,7 @@ function playAudio(arraybuffer){
     source.buffer = buffer;
     source.connect(audioCtx.destination);
     source.start();
-  } catch(e) { console.error('audio play error:', e); }
+  } catch(e) { console.error('[voice] audio play error:', e); }
 }
 
 function floatToPCM16(float32){
