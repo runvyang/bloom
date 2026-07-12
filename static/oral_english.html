@@ -21,9 +21,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 #transcript{width:100%;max-width:600px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px}
 #transcript::-webkit-scrollbar{width:3px}
 #transcript::-webkit-scrollbar-thumb{background:var(--border)}
-.trans-line{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;animation:fade-in .3s}
-.trans-line.teacher{background:var(--surface);border-left:3px solid var(--green)}
-.trans-line.student{background:var(--surface2);border-left:3px solid var(--accent)}
+.trans-line{padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;animation:fade-in .3s;max-width:85%}
+.trans-line.teacher{align-self:flex-end;background:var(--accent);color:#fff;border-radius:12px 12px 2px 12px}
+.trans-line.student{align-self:flex-start;background:var(--surface2);border-radius:12px 12px 12px 2px}
+.trans-line.streaming{opacity:.7}
 @keyframes fade-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 #back-btn{position:fixed;top:16px;left:16px;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text2);cursor:pointer;font-size:13px;text-decoration:none}
 #back-btn:hover{color:var(--text)}
@@ -191,18 +192,55 @@ function playNextChunk(){
 
 // ─── UI ─────────────────────────────────────────────────
 
+let streamingText = '';
+let streamingEl = null;
+
 function handleMessage(msg){
-  console.log('[voice] handle:', msg.type, msg);
-  if (msg.type === 'chat_text') addTranscript('teacher', msg.content || '');
-  if (msg.type === 'tts_start' && msg.text) addTranscript('teacher', msg.text);
-  if (msg.type === 'asr') { document.getElementById('user-text').textContent = msg.text || ''; if (msg.text) addTranscript('student', msg.text); }
+  if (msg.type === 'chat_text') {
+    // Accumulate streaming teacher text
+    streamingText += (msg.content || '');
+    if (!streamingEl) {
+      streamingEl = addTranscript('teacher', '', true);
+    }
+    streamingEl.textContent = streamingText;
+    scrollTranscript();
+  }
+  if (msg.type === 'tts_ended') {
+    // Flush streaming text as final
+    if (streamingEl) {
+      streamingEl.classList.remove('streaming');
+      streamingEl = null;
+      streamingText = '';
+    }
+  }
+  if (msg.type === 'tts_start' && msg.text) {
+    // Full sentence from tts_start — replace streaming
+    streamingText = '';
+    if (streamingEl) { streamingEl.remove(); streamingEl = null; }
+    addTranscript('teacher', msg.text);
+  }
+  if (msg.type === 'asr') {
+    document.getElementById('user-text').textContent = msg.text || '';
+    // Flush any streaming teacher bubble before showing student text
+    if (streamingEl) { streamingEl.classList.remove('streaming'); streamingEl = null; streamingText = ''; }
+    if (msg.text) addTranscript('student', msg.text);
+  }
 }
 
-function addTranscript(role, text){
+function addTranscript(role, text, streaming){
   const el = document.getElementById('transcript');
   const line = document.createElement('div');
-  line.className = 'trans-line ' + role; line.textContent = text;
-  el.appendChild(line); el.scrollTop = el.scrollHeight;
+  line.className = 'trans-line ' + role;
+  if (streaming) line.classList.add('streaming');
+  line.textContent = text;
+  el.appendChild(line);
+  scrollTranscript();
+  return line;
+}
+
+function scrollTranscript(){
+  const el = document.getElementById('transcript');
+  el.scrollTop = el.scrollHeight;
 }
 
 function updateUI(state){
