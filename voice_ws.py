@@ -1,64 +1,104 @@
 """
-Voice proxy: Browser STT → text query → Volcengine → TTS audio → Browser.
-No raw audio frames — uses ChatTextQuery(501) which works reliably.
+Voice proxy using Volcengine binary protocol — based on official realtime_dialog_client.py.
+Key: ALL payloads MUST be gzip compressed with GZIP flag in header.
 """
-import asyncio, ssl, struct, json, uuid, os, base64, traceback
+import asyncio, struct, json, uuid, os, gzip, traceback
+import websockets
 from auth import validate_session
 
 VOLC_APP_ID = os.getenv("VOLC_APP_ID", "")
 VOLC_ACCESS_KEY = os.getenv("VOLC_ACCESS_KEY", "")
-VOLC_HOST = "openspeech.bytedance.com"
-VOLC_PATH = "/api/v3/realtime/dialogue"
+VOLC_API_URL = "wss://openspeech.bytedance.com/api/v3/realtime/dialogue"
 VOLC_APP_KEY = os.getenv("VOLC_APP_KEY", "")
 
-# ─── Raw WebSocket ───
+# ─── Protocol constants (matching official protocol.py) ───
 
-def ws_frame(data: bytes, opcode: int = 0x2) -> bytes:
-    length = len(data); mask = os.urandom(4)
-    b0 = 0x80 | opcode
-    if length < 126: header = bytes([b0, 0x80 | length])
-    elif length < 65536: header = bytes([b0, 0x80 | 126]) + struct.pack(">H", length)
-    else: header = bytes([b0, 0x80 | 127]) + struct.pack(">Q", length)
-    return header + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+CLIENT_FULL_REQUEST = 0b0001
+CLIENT_AUDIO_ONLY_REQUEST = 0b0010
+NO_SEQUENCE = 0b0000
+MSG_WITH_EVENT = 0b0100
+NO_SERIALIZATION = 0b0000
+JSON = 0b0001
+NO_COMPRESSION = 0b0000
+GZIP = 0b0001
 
-async def ws_read(reader):
-    hdr = await reader.readexactly(2)
-    plen = hdr[1] & 0x7F
-    if plen == 126: plen = struct.unpack(">H", await reader.readexactly(2))[0]
-    elif plen == 127: plen = struct.unpack(">Q", await reader.readexactly(8))[0]
-    mk = await reader.readexactly(4) if (hdr[1] & 0x80) else b""
-    payload = await reader.readexactly(plen)
-    return bytes(b ^ mk[i % 4] for i, b in enumerate(payload)) if mk else payload
+def generate_header(message_type=CLIENT_FULL_REQUEST,
+                    flags=MSG_WITH_EVENT,
+                    serial=JSON,
+                    compression=GZIP):
+    """Match official protocol.generate_header() exactly."""
+    header = bytearray()
+    header.append((0b0001 << 4) | 1)  # version=1, header_size=1
+    header.append((message_type << 4) | flags)
+    header.append((serial << 4) | compression)
+    header.append(0x00)  # reserved
+    return header
 
-# ─── Volc binary protocol ───
+def compress(data: bytes) -> bytes:
+    return gzip.compress(data)
 
-def build_text(event_id: int, sid: str, payload: dict) -> bytes:
-    pb = json.dumps(payload, ensure_ascii=False).encode(); sb = sid.encode()
-    return (bytes([0x11, 0x14, 0x10, 0x00]) + struct.pack(">I", event_id) +
-            struct.pack(">I", len(sb)) + sb + struct.pack(">I", len(pb)) + pb)
+# ─── Frame builders (matching official realtime_dialog_client.py) ───
 
-def parse_frame(data: bytes):
-    if len(data) < 4: return None
-    mt = (data[1] >> 4) & 0x0F; flags = data[1] & 0x0F; off = 4
-    if mt == 0x0F:
-        code = struct.unpack(">I", data[off:off+4])[0]; off += 4
-        psize = struct.unpack(">I", data[off:off+4])[0]; off += 4
-        return {"type": mt, "error_code": code, "json": json.loads(data[off:off+psize].decode())}
-    eid = None
-    if (flags & 0x04) and len(data) >= off + 4:
-        eid = struct.unpack(">I", data[off:off+4])[0]; off += 4
-    if len(data) >= off + 4:
-        ssz = struct.unpack(">I", data[off:off+4])[0]; off += 4
-        if ssz > 0 and len(data) >= off + ssz: off += ssz
-    psize = struct.unpack(">I", data[off:off+4])[0]; off += 4
-    payload = data[off:off+psize]
-    result = {"type": mt, "event_id": eid}
-    if payload:
-        if mt in (0x09, 0x01):
-            try: result["json"] = json.loads(payload.decode())
-            except: result["text"] = payload.decode(errors="replace")
-        elif mt == 0x0B: result["audio"] = payload
+def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
+    """Full-client text event with GZIP compression."""
+    pb = compress(str.encode(json.dumps(payload)))
+    sb = str.encode(session_id)
+    frame = bytearray(generate_header())
+    frame.extend(event_id.to_bytes(4, 'big'))
+    frame.extend(len(sb).to_bytes(4, 'big'))
+    frame.extend(sb)
+    frame.extend(len(pb).to_bytes(4, 'big'))
+    frame.extend(pb)
+    return bytes(frame)
+
+def build_audio_frame(session_id: str, audio_data: bytes) -> bytes:
+    """Audio-only request with GZIP compression."""
+    pb = compress(audio_data)
+    sb = str.encode(session_id)
+    frame = bytearray(generate_header(message_type=CLIENT_AUDIO_ONLY_REQUEST,
+                                       serial=NO_SERIALIZATION))
+    frame.extend(200 .to_bytes(4, 'big'))  # TaskRequest event
+    frame.extend(len(sb).to_bytes(4, 'big'))
+    frame.extend(sb)
+    frame.extend(len(pb).to_bytes(4, 'big'))
+    frame.extend(pb)
+    return bytes(frame)
+
+# ─── Response parser (matching official protocol.py) ───
+
+def parse_response(data: bytes):
+    if isinstance(data, str): return {}
+    mt = data[1] >> 4
+    flags = data[1] & 0x0f
+    serial = data[2] >> 4
+    compression = data[2] & 0x0f
+
+    # Error frame
+    if mt == 0b1111:
+        code = int.from_bytes(data[4:8], 'big')
+        psize = int.from_bytes(data[8:12], 'big')
+        pdata = data[12:12+psize]
+        if compression == GZIP: pdata = gzip.decompress(pdata)
+        return {"type": mt, "error_code": code, "json": json.loads(str(pdata, 'utf-8'))}
+
+    # Full response / ACK
+    result = {"type": mt, "event": None, "session_id": None, "payload_msg": None, "audio": None}
+    start = 4
+    if flags & MSG_WITH_EVENT:
+        result["event"] = int.from_bytes(data[start:start+4], 'big')
+        start += 4
+    sid_size = int.from_bytes(data[start:start+4], 'big', signed=True)
+    result["session_id"] = str(data[start+4:start+4+sid_size])
+    start += 4 + sid_size
+    psize = int.from_bytes(data[start:start+4], 'big')
+    payload = data[start+4:start+4+psize]
+    if compression == GZIP: payload = gzip.decompress(payload)
+    if serial == JSON:
+        result["payload_msg"] = json.loads(str(payload, 'utf-8'))
+    elif serial == NO_SERIALIZATION:
+        result["audio"] = payload  # raw audio
     return result
+
 
 def get_prompt() -> str:
     path = "courses/oral_english/world_model.md"
@@ -77,43 +117,40 @@ async def handle_voice(ws):
         await ws.send_text(json.dumps({"type": "error", "message": "Invalid token"})); await ws.close(); return
 
     username = user["username"]; sid = str(uuid.uuid4())
-    reader = writer = None
+    volc_ws = None
     print(f"[voice] {username} connecting...")
 
     try:
-        # Connect to Volcengine (raw WebSocket)
-        ws_key = base64.b64encode(os.urandom(16)).decode()
-        request = (
-            f"GET {VOLC_PATH} HTTP/1.1\r\nHost: {VOLC_HOST}\r\n"
-            f"Upgrade: websocket\r\nConnection: Upgrade\r\n"
-            f"Sec-WebSocket-Key: {ws_key}\r\nSec-WebSocket-Version: 13\r\n"
-            f"X-Api-App-ID: {VOLC_APP_ID}\r\n"
-            f"X-Api-Access-Key: {VOLC_ACCESS_KEY}\r\n"
-            f"X-Api-Resource-Id: volc.speech.dialog\r\n"
-            f"X-Api-App-Key: {VOLC_APP_KEY}\r\n\r\n"
-        ).encode()
-        reader, writer = await asyncio.open_connection(VOLC_HOST, 443, ssl=ssl.create_default_context())
-        writer.write(request); await writer.drain()
-        resp = b""
-        while b"\r\n\r\n" not in resp: resp += await reader.read(4096)
-        if b"101" not in resp: print(f"[voice] Upgrade failed!"); return
+        headers = {
+            "X-Api-App-ID": VOLC_APP_ID, "X-Api-Access-Key": VOLC_ACCESS_KEY,
+            "X-Api-Resource-Id": "volc.speech.dialog", "X-Api-App-Key": VOLC_APP_KEY,
+        }
+        volc_ws = await websockets.connect(VOLC_API_URL, extra_headers=headers, ping_interval=None)
         print(f"[voice] Volc connected")
 
+        # StartConnection (matching official demo)
+        sc = bytearray(generate_header())
+        sc.extend((1).to_bytes(4, 'big'))
+        pb = compress(b"{}")
+        sc.extend(len(pb).to_bytes(4, 'big')); sc.extend(pb)
+        await volc_ws.send(bytes(sc))
+        resp = await volc_ws.recv()
+        print(f"[voice] StartConnection: {parse_response(resp).get('event')}")
+
         # StartSession
-        writer.write(ws_frame(build_text(100, sid, {
+        ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
             "dialog": {"bot_name": "Teacher", "system_role": get_prompt(),
                        "speaking_style": "friendly", "extra": {"model": "1.2.1.1"}},
             "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
                     "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
-        }))); await writer.drain()
+        }
+        await volc_ws.send(build_text_frame(100, sid, ss_payload))
+        resp = await volc_ws.recv()
+        r = parse_response(resp)
+        print(f"[voice] StartSession: event={r.get('event')}")
 
-        raw = await ws_read(reader)
-        f = parse_frame(raw)
-        if not f or f.get("event_id") != 150: print(f"[voice] Start failed"); return
-        print(f"[voice] Session started")
-
-        # Relay: browser text queries → Volc, Volc responses → browser
+        # Relay
         async def browser_to_volc():
             while True:
                 try: data = await ws.receive()
@@ -123,28 +160,25 @@ async def handle_voice(ws):
                         msg = json.loads(data["text"])
                         if msg.get("type") == "text_query" and msg.get("content"):
                             print(f"[voice] STT: {msg['content'][:80]}")
-                            writer.write(ws_frame(build_text(501, sid, {"content": msg["content"]})))
+                            await volc_ws.send(build_text_frame(501, sid, {"content": msg["content"]}))
                         elif msg.get("type") == "end_session":
-                            writer.write(ws_frame(build_text(102, sid, {}))); break
+                            await volc_ws.send(build_text_frame(102, sid, {})); break
                     except Exception: pass
+                elif "bytes" in data:
+                    await volc_ws.send(build_audio_frame(sid, data["bytes"]))  # audio relay if needed
 
         async def volc_to_browser():
             while True:
-                try: raw = await asyncio.wait_for(ws_read(reader), timeout=60)
+                try: raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
                 except asyncio.TimeoutError: continue
                 except Exception: break
-                f = parse_frame(raw)
-                if not f: continue
-                eid = f.get("event_id"); p = f.get("json") or {}
-
-                if f.get("audio"):
-                    await ws.send_bytes(f["audio"])
-                elif eid == 550:
+                r = parse_response(raw)
+                evt = r.get("event"); p = r.get("payload_msg") or {}
+                if r.get("audio"): await ws.send_bytes(r["audio"])
+                elif evt == 550:
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
-                elif eid == 350:
+                elif evt == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 553:
-                    pass  # ack
 
         b2v = asyncio.create_task(browser_to_volc())
         v2b = asyncio.create_task(volc_to_browser())
@@ -158,7 +192,7 @@ async def handle_voice(ws):
         print(f"[voice] Error: {type(e).__name__}: {e}")
         traceback.print_exc()
     finally:
-        if writer:
-            try: writer.write(ws_frame(build_text(102, sid, {}))); writer.close()
+        if volc_ws:
+            try: await volc_ws.send(build_text_frame(102, sid, {})); await volc_ws.close()
             except: pass
         print(f"[voice] {username} disconnected")
