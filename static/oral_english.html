@@ -63,8 +63,8 @@ async function startCall(){
   try {
     // Audio context for mic capture (16kHz)
     audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    // Separate context for playback (24kHz from Volcengine TTS)
-    playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Separate context for playback — MUST match Volc TTS sample rate (24000)
+    playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
 
     // Mic capture
     micStream = await navigator.mediaDevices.getUserMedia({
@@ -137,7 +137,7 @@ function playAudio(arraybuffer){
   audioChunks++;
   try {
     const pcm = new Int16Array(arraybuffer);
-    if (audioChunks <= 3) console.log(`[voice] play audio #${audioChunks}: ${pcm.length} samples`);
+    if (audioChunks <= 3) console.log(`[voice] play audio #${audioChunks}: ${pcm.length} samples, first=[${pcm[0]},${pcm[1]},${pcm[2]}]`);
     const buffer = playbackCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
