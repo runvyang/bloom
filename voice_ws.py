@@ -141,21 +141,8 @@ async def handle_voice(ws):
         volc_ws = await websockets.connect(VOLC_API_URL, additional_headers=headers)
         print(f"[voice] Volcengine WS connected, starting session...")
 
-        # Step 1: StartConnection → wait for ConnectionStarted (event 50)
-        sc_frame = build_text_frame(1, session_id, {})
-        print(f"[voice] -> StartConnection ({len(sc_frame)} bytes): {sc_frame.hex()}")
-        await volc_ws.send(sc_frame)
-
-        raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
-        frame = parse_frame(raw)
-        print(f"[voice] <- after StartConnection: type={frame.get('type')}, event={frame.get('event_id')}, error_code={frame.get('error_code')}")
-        if frame.get("json"):
-            print(f"[voice] <- frame payload: {json.dumps(frame['json'], ensure_ascii=False)}")
-        if frame.get("event_id") != 50:
-            print(f"[voice] !!! Expected ConnectionStarted(50)")
-            return
-
-        # Step 2: StartSession
+        # Start directly with StartSession (WebSocket connect = Connection)
+        # per docs: "客户端发送StartSession事件初始化会话"
         ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}},
             "dialog": {
@@ -174,7 +161,7 @@ async def handle_voice(ws):
         print(f"[voice] -> StartSession ({len(ss_frame)} bytes)")
         await volc_ws.send(ss_frame)
 
-        # Step 3: Wait for SessionStarted (event 150)
+        # Wait for SessionStarted (event 150)
         print(f"[voice] Waiting for SessionStarted...")
         try:
             raw = await asyncio.wait_for(volc_ws.recv(), timeout=10)
