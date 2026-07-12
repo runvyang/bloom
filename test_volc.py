@@ -1,10 +1,10 @@
-"""Minimal end-to-end test: connect, send text, get TTS audio."""
-import asyncio, ssl, struct, json, uuid, os, base64
+"""Quick audio frame test — connect, send mock audio, see response."""
+import asyncio, ssl, struct, json, uuid, os, base64, math
 
 def ws_frame(data: bytes, opcode: int = 0x2) -> bytes:
-    b0 = 0x80 | opcode
     length = len(data)
     mask = os.urandom(4)
+    b0 = 0x80 | opcode
     if length < 126:
         header = bytes([b0, 0x80 | length])
     elif length < 65536:
@@ -24,22 +24,20 @@ async def ws_read(reader):
     payload = await reader.readexactly(plen)
     return opcode, bytes(b ^ mk[i % 4] for i, b in enumerate(payload)) if mk else payload
 
-def build_text_frame(event_id: int, sid: str, payload: dict) -> bytes:
+def build_text(event_id: int, sid: str, payload: dict) -> bytes:
     pb = json.dumps(payload, ensure_ascii=False).encode()
     sb = sid.encode()
-    header = bytes([0x11, 0x14, 0x10, 0x00])
-    event_bytes = struct.pack(">I", event_id)
-    sid_size = struct.pack(">I", len(sb))
-    payload_size = struct.pack(">I", len(pb))
-    return header + event_bytes + sid_size + sb + payload_size + pb
+    return (bytes([0x11, 0x14, 0x10, 0x00]) +
+            struct.pack(">I", event_id) +
+            struct.pack(">I", len(sb)) + sb +
+            struct.pack(">I", len(pb)) + pb)
 
 def parse_frame(data: bytes):
     if len(data) < 4: return None
     mt = (data[1] >> 4) & 0x0F
     flags = data[1] & 0x0F
     off = 4
-    code = None
-    if mt == 0x0F and len(data) >= off + 4:
+    if mt == 0x0F:
         code = struct.unpack(">I", data[off:off+4])[0]; off += 4
         psize = struct.unpack(">I", data[off:off+4])[0]; off += 4
         return {"type": mt, "error_code": code, "json": json.loads(data[off:off+psize].decode())}
@@ -58,6 +56,14 @@ def parse_frame(data: bytes):
             except: result["text"] = payload.decode(errors="replace")
         elif mt == 0x0B: result["audio"] = payload
     return result
+
+def make_sine_wave(duration_ms=100, freq=440, sample_rate=16000):
+    """Generate PCM int16 LE sine wave."""
+    samples = int(sample_rate * duration_ms / 1000)
+    return struct.pack("<" + "h" * samples, *[
+        int(16000 * math.sin(2 * math.pi * freq * i / sample_rate))
+        for i in range(samples)
+    ])
 
 async def main():
     host, path = "openspeech.bytedance.com", "/api/v3/realtime/dialogue"
@@ -82,35 +88,69 @@ async def main():
     sid = str(uuid.uuid4())
 
     # StartSession
-    ss = build_text_frame(100, sid, {
+    writer.write(ws_frame(build_text(100, sid, {
         "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
         "dialog": {"bot_name": "test", "extra": {"model": "1.2.1.1"}},
         "tts": {"speaker": "zh_female_vv_jupiter_bigtts", "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
-    })
-    writer.write(ws_frame(ss)); await writer.drain()
+    }))); await writer.drain()
     op, raw = await ws_read(reader)
     f = parse_frame(raw)
-    print(f"SessionStarted: event={f.get('event_id')}, json={f.get('json')}")
+    print(f"SessionStarted: event={f.get('event_id')}, {f.get('json')}")
 
-    # Send text query
-    tq = build_text_frame(501, sid, {"content": "Hello! How are you?"})
-    writer.write(ws_frame(tq)); await writer.drain()
-    print("Sent: Hello! How are you?")
-
-    # Read responses
-    for _ in range(10):
-        op, raw = await ws_read(reader)
+    # Test 1: Full-client audio frame (event 200 + session_id + audio payload)
+    print("\n--- Test 1: Full-client event=200 with session_id ---")
+    audio = make_sine_wave(100)  # 100ms of 440Hz
+    sb = sid.encode()
+    frame = (bytes([0x11, 0x14, 0x10, 0x00]) +  # Full-client, has event
+             struct.pack(">I", 200) +              # TaskRequest
+             struct.pack(">I", len(sb)) + sb +     # session_id
+             struct.pack(">I", len(audio)) + audio) # payload
+    writer.write(ws_frame(frame)); await writer.drain()
+    print(f"Sent: header+event(200)+sid({len(sb)})+payload({len(audio)}bytes)")
+    try:
+        op, raw = await asyncio.wait_for(ws_read(reader), timeout=5)
         f = parse_frame(raw)
-        if not f: continue
-        print(f"event={f.get('event_id')}", end="")
-        if f.get("json"): print(f" json={json.dumps(f['json'], ensure_ascii=False)[:200]}")
-        elif f.get("audio"): print(f" AUDIO {len(f['audio'])} bytes")
-        elif f.get("text"): print(f" text={f['text'][:200]}")
-        else: print()
-        if f.get("event_id") == 359: break  # TTSEnded
+        eid = f.get('event_id')
+        print(f"Response: event={eid}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
+        if f.get('audio'): print(f"  AUDIO: {len(f['audio'])} bytes")
+    except asyncio.TimeoutError:
+        print("  (timeout — no response)")
 
-    # Send FinishSession
-    writer.write(ws_frame(build_text_frame(102, sid, {}))); await writer.drain()
+    # Test 2: Audio-only frame (msg_type=0b0010, no event, no sid)
+    print("\n--- Test 2: Audio-only msg_type=2, no event/sid ---")
+    audio2 = make_sine_wave(100, 880)
+    frame2 = (bytes([0x11, 0x20, 0x10, 0x00]) +  # Audio-only, flags=0
+              struct.pack(">I", len(audio2)) + audio2)
+    writer.write(ws_frame(frame2)); await writer.drain()
+    print(f"Sent: header+payload({len(audio2)}bytes)")
+    try:
+        op, raw = await asyncio.wait_for(ws_read(reader), timeout=5)
+        f = parse_frame(raw)
+        eid = f.get('event_id')
+        print(f"Response: event={eid}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
+        if f.get('audio'): print(f"  AUDIO: {len(f['audio'])} bytes")
+    except asyncio.TimeoutError:
+        print("  (timeout — no response)")
+
+    # Test 3: Audio frame with session_id but no event
+    print("\n--- Test 3: Audio with session_id, no event ---")
+    audio3 = make_sine_wave(100, 220)
+    frame3 = (bytes([0x11, 0x20, 0x10, 0x00]) +
+              struct.pack(">I", len(sb)) + sb +
+              struct.pack(">I", len(audio3)) + audio3)
+    writer.write(ws_frame(frame3)); await writer.drain()
+    print(f"Sent: header+sid({len(sb)})+payload({len(audio3)}bytes)")
+    try:
+        op, raw = await asyncio.wait_for(ws_read(reader), timeout=5)
+        f = parse_frame(raw)
+        eid = f.get('event_id')
+        print(f"Response: event={eid}, json={json.dumps(f.get('json',''), ensure_ascii=False)[:200]}")
+        if f.get('audio'): print(f"  AUDIO: {len(f['audio'])} bytes")
+    except asyncio.TimeoutError:
+        print("  (timeout — no response)")
+
+    writer.write(ws_frame(build_text(102, sid, {}))); await writer.drain()
     writer.close()
+    print("\nDone!")
 
 asyncio.run(main())
