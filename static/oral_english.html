@@ -119,7 +119,7 @@ async function startCall(){
 }
 
 function endCall(){
-  isCalling = false;
+  isCalling = false; audioQueue = []; isPlaying = false;
   if (ws) { try { ws.close() } catch(e) {}; ws = null; }
   if (micNode) { micNode.disconnect(); micNode = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -131,20 +131,31 @@ function endCall(){
 
 // ─── Audio playback ─────────────────────────────────────
 
-let audioChunks = 0;
+let audioQueue = [];
+let isPlaying = false;
+
 function playAudio(arraybuffer){
+  audioQueue.push(arraybuffer);
+  if (!isPlaying) playNextChunk();
+}
+
+function playNextChunk(){
+  if (audioQueue.length === 0) { isPlaying = false; return; }
+  isPlaying = true;
   if (!playbackCtx || playbackCtx.state === 'closed') return;
   if (playbackCtx.state === 'suspended') playbackCtx.resume();
-  audioChunks++;
+
+  const arraybuffer = audioQueue.shift();
   try {
     const pcm = new Int16Array(arraybuffer);
-    if (audioChunks <= 5) console.log(`[voice] play #${audioChunks}: ${pcm.length} samples, ctx=${playbackCtx.sampleRate}Hz, first=[${pcm[0]},${pcm[1]},${pcm[2]}]`);
     const buffer = playbackCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
     const source = playbackCtx.createBufferSource();
-    source.buffer = buffer; source.connect(playbackCtx.destination); source.start();
-  } catch(e) { console.error('[voice] play err:', e); }
+    source.buffer = buffer; source.connect(playbackCtx.destination);
+    source.onended = () => playNextChunk();
+    source.start();
+  } catch(e) { console.error('[voice] play err:', e); isPlaying = false; }
 }
 
 // ─── UI ─────────────────────────────────────────────────
