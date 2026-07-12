@@ -52,12 +52,12 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
     return bytes(frame)
 
 def build_audio_frame(session_id: str, audio_data: bytes) -> bytes:
-    """Audio-only request with GZIP compression."""
+    """Audio-only request with GZIP compression — matching official task_request()."""
     pb = compress(audio_data)
     sb = str.encode(session_id)
     frame = bytearray(generate_header(message_type=CLIENT_AUDIO_ONLY_REQUEST,
                                        serial=NO_SERIALIZATION))
-    frame.extend(200 .to_bytes(4, 'big'))  # TaskRequest event
+    frame.extend((200).to_bytes(4, 'big'))  # TaskRequest event
     frame.extend(len(sb).to_bytes(4, 'big'))
     frame.extend(sb)
     frame.extend(len(pb).to_bytes(4, 'big'))
@@ -152,20 +152,20 @@ async def handle_voice(ws):
 
         # Relay
         async def browser_to_volc():
+            n = 0
             while True:
                 try: data = await ws.receive()
                 except Exception: break
-                if "text" in data:
+                if "bytes" in data:
+                    n += 1
+                    await volc_ws.send(build_audio_frame(sid, data["bytes"]))
+                    if n <= 3 or n % 100 == 0:
+                        print(f"[voice] audio #{n}: {len(data['bytes'])} bytes")
+                elif "text" in data:
                     try:
-                        msg = json.loads(data["text"])
-                        if msg.get("type") == "text_query" and msg.get("content"):
-                            print(f"[voice] STT: {msg['content'][:80]}")
-                            await volc_ws.send(build_text_frame(501, sid, {"content": msg["content"]}))
-                        elif msg.get("type") == "end_session":
+                        if json.loads(data["text"]).get("type") == "end_session":
                             await volc_ws.send(build_text_frame(102, sid, {})); break
                     except Exception: pass
-                elif "bytes" in data:
-                    await volc_ws.send(build_audio_frame(sid, data["bytes"]))  # audio relay if needed
 
         async def volc_to_browser():
             while True:

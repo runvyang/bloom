@@ -18,9 +18,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 #call-btn.start{background:var(--green);color:#fff}
 #call-btn.start:hover{transform:scale(1.08)}
 #call-btn.end{background:var(--red);color:#fff}
-#mic-btn{width:60px;height:60px;border-radius:50%;border:2px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:24px;transition:all .15s;display:none}
-#mic-btn.recording{background:var(--red);color:#fff;border-color:var(--red);animation:pulse-mic .8s infinite}
-@keyframes pulse-mic{0%,100%{box-shadow:0 0 0 0 rgba(248,113,113,.4)}50%{box-shadow:0 0 0 12px rgba(248,113,113,0)}}
 #transcript{width:100%;max-width:600px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px}
 #transcript::-webkit-scrollbar{width:3px}
 #transcript::-webkit-scrollbar-thumb{background:var(--border)}
@@ -41,7 +38,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   <div id="user-text"></div>
   <div style="display:flex;gap:16px;align-items:center">
     <button id="call-btn" class="start" onclick="toggleCall()">📞</button>
-    <button id="mic-btn" onmousedown="startSTT(event)" onmouseup="stopSTT()" onmouseleave="stopSTT()" ontouchstart="startSTT(event)" ontouchend="stopSTT()" title="按住说英语，松开发送">🎤</button>
   </div>
   <div id="transcript"></div>
 </div>
@@ -50,7 +46,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 const API = window.location.origin;
 let authToken = localStorage.getItem('auth_token');
 let ws = null, audioCtx = null, isCalling = false, callStartTime = 0, timerInterval = null;
-let sttRecognition = null, sttText = '';
 
 (async function(){
   if (!authToken) { location.href = '/'; return; }
@@ -62,9 +57,24 @@ async function toggleCall(){
   if (isCalling) { endCall(); } else { await startCall(); }
 }
 
+let micStream = null, micNode = null;
+
 async function startCall(){
   try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // Audio context for both capture and playback
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+    // Mic capture
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+    const source = audioCtx.createMediaStreamSource(micStream);
+    micNode = audioCtx.createScriptProcessor(1024, 1, 1);
+    source.connect(micNode);
+    const zg = audioCtx.createGain(); zg.gain.value = 0;
+    micNode.connect(zg); zg.connect(audioCtx.destination);
+
+    // WebSocket
     const wsUrl = `${API.replace('http','ws')}/ws/voice/oral_english?token=${authToken}`;
     ws = new WebSocket(wsUrl);
     ws.binaryType = 'arraybuffer';
@@ -74,12 +84,11 @@ async function startCall(){
     ws.onmessage = (event) => {
       if (typeof event.data === 'string') {
         let msg; try { msg = JSON.parse(event.data) } catch(e) { return }
-        console.log('[voice] got:', msg.type, msg);
         if (!wsReady) {
           if (msg.type === 'ready') {
             wsReady = true; isCalling = true; callStartTime = Date.now();
             updateUI('connected'); startTimer();
-            setStatus('按住 🎤 说英语，松开发送');
+            setStatus('已连接，开始说话吧！');
           } else if (msg.type === 'error') { setStatus('失败: ' + msg.message); }
           return;
         }
@@ -90,53 +99,32 @@ async function startCall(){
     };
     ws.onerror = () => { endCall(); };
     ws.onclose = () => { if (isCalling) endCall(); };
-  } catch(e) { console.error(e); setStatus('连接失败'); endCall(); }
+
+    // Send mic audio continuously
+    micNode.onaudioprocess = (e) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const buf = new ArrayBuffer(input.length * 2);
+      const view = new DataView(buf);
+      for (let i = 0; i < input.length; i++) {
+        let s = Math.max(-1, Math.min(1, input[i]));
+        view.setInt16(i*2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      ws.send(buf);
+    };
+
+  } catch(e) { console.error(e); setStatus('需要麦克风权限'); endCall(); }
 }
 
 function endCall(){
-  isCalling = false; stopSTT();
+  isCalling = false;
   if (ws) { try { ws.close() } catch(e) {}; ws = null; }
+  if (micNode) { micNode.disconnect(); micNode = null; }
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   updateUI('idle');
 }
-
-// ─── STT ────────────────────────────────────────────────
-
-function initSTT(){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return;
-  sttRecognition = new SR();
-  sttRecognition.lang = 'en-US';
-  sttRecognition.interimResults = true;
-  sttRecognition.continuous = true;
-  sttRecognition.onresult = (e) => {
-    let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
-    sttText = t; document.getElementById('user-text').textContent = t;
-  };
-  sttRecognition.onerror = (e) => console.log('[stt] err:', e.error);
-}
-
-function startSTT(e){
-  e.preventDefault();
-  if (!sttRecognition) initSTT();
-  if (!sttRecognition) return;
-  sttText = ''; document.getElementById('user-text').textContent = '🎤 聆听中...';
-  try { sttRecognition.start() } catch(ex) {}
-  document.getElementById('mic-btn').classList.add('recording');
-  setStatus('正在聆听...松开发送', 'loading');
-}
-
-function stopSTT(){
-  if (!sttRecognition) return;
-  try { sttRecognition.stop() } catch(ex) {}
-  document.getElementById('mic-btn').classList.remove('recording');
-  setStatus('按住 🎤 说英语');
-  if (sttText.trim() && ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({type: 'text_query', content: sttText.trim()}));
-    addTranscript('student', sttText.trim());
-  }
-  sttText = '';
 }
 
 // ─── Audio playback ─────────────────────────────────────
