@@ -143,7 +143,9 @@ async def handle_voice(ws):
             "dialog": {"bot_name": "Teacher", "system_role": get_prompt(),
                        "speaking_style": "friendly", "extra": {"model": "1.2.1.1"}},
             "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
-                    "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000}, "extra": {}}
+                    "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000,
+                                     "speech_rate": -10},
+                    "extra": {}}
         }
         await volc_ws.send(build_text_frame(100, sid, ss_payload))
         resp = await volc_ws.recv()

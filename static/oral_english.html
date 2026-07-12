@@ -153,6 +153,7 @@ function playNextChunk(){
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
     const source = playbackCtx.createBufferSource();
     source.buffer = buffer; source.connect(playbackCtx.destination);
+    source.playbackRate.value = 0.92;  // slightly slower for young learners
     source.onended = () => playNextChunk();
     source.start();
   } catch(e) { console.error('[voice] play err:', e); isPlaying = false; }
