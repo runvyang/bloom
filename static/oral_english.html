@@ -158,8 +158,9 @@ async function startCall(){
 
     // Send mic audio to server — with simple VAD (voice activity detection)
     let silenceFrames = 0;
-    const SILENCE_THRESHOLD = 0.01;  // RMS energy below this = silence
-    const SILENCE_HANGOVER = 8;       // frames of silence before stopping (~0.5s at 64ms/frame)
+    let totalFrames = 0;
+    const SILENCE_THRESHOLD = 0.005;  // RMS energy below this = silence (lowered for kids' voice)
+    const SILENCE_HANGOVER = 15;       // frames of silence before stopping (~1s)
 
     micNode.onaudioprocess = (e) => {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -170,16 +171,20 @@ async function startCall(){
       for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       const rms = Math.sqrt(sum / input.length);
 
+      totalFrames++;
+      if (totalFrames % 30 === 0) {
+        console.log('[voice] VAD rms=' + rms.toFixed(4) + ' silenceFrames=' + silenceFrames + ' sent=' + (silenceFrames < SILENCE_HANGOVER));
+        document.getElementById('user-text').textContent =
+          rms > SILENCE_THRESHOLD ? '🎤 检测到语音...' : (silenceFrames < SILENCE_HANGOVER ? '...' : '🔇 静音中');
+      }
+
       if (rms > SILENCE_THRESHOLD) {
-        // Speaking — send audio
         silenceFrames = 0;
         ws.send(floatToPCM16(input));
       } else if (silenceFrames < SILENCE_HANGOVER) {
-        // Recently spoke — send trailing silence
         silenceFrames++;
         ws.send(floatToPCM16(input));
       }
-      // else: long silence — don't send (let Volc VAD handle it)
     };
 
   } catch(e) {

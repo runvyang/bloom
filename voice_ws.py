@@ -169,12 +169,16 @@ async def handle_voice(ws):
             return
         print(f"[voice] Volc session started")
 
+        audio_count = [0]
         async def browser_to_volc():
             while True:
                 try: data = await ws.receive()
                 except Exception: break
                 if "bytes" in data:
+                    audio_count[0] += 1
                     await volc_ws.send(build_audio_frame(session_id, data["bytes"]))
+                    if audio_count[0] <= 5 or audio_count[0] % 100 == 0:
+                        print(f"[voice] audio #{audio_count[0]}: {len(data['bytes'])} bytes")
                 elif "text" in data:
                     try:
                         if json.loads(data["text"]).get("type") == "end_session":
@@ -192,9 +196,11 @@ async def handle_voice(ws):
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
 
+                if eid is not None or p:
+                    print(f"[voice] <- Volc eid={eid}, p={json.dumps(p, ensure_ascii=False)[:200]}, audio={'audio' in frame}")
+
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
-                    print(f"[voice] ASR: {text}")
                     await ws.send_text(json.dumps({"type": "asr", "text": text}, ensure_ascii=False))
                 elif eid == 550:  # Chat text
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
