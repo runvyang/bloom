@@ -194,36 +194,33 @@ function playNextChunk(){
 
 let streamingText = '';
 let streamingEl = null;
+let newTurn = true;  // start a fresh bubble for each teacher response
 
 function handleMessage(msg){
   if (msg.type === 'chat_text') {
-    // Accumulate streaming teacher text
-    streamingText += (msg.content || '');
-    if (!streamingEl) {
+    if (newTurn) {
+      // New conversation turn — start fresh bubble
+      if (streamingEl) { streamingEl.classList.remove('streaming'); streamingEl = null; }
+      streamingText = '';
       streamingEl = addTranscript('teacher', '', true);
+      newTurn = false;
     }
-    streamingEl.textContent = streamingText;
+    streamingText += (msg.content || '');
+    if (streamingEl) streamingEl.textContent = streamingText;
     scrollTranscript();
   }
   if (msg.type === 'tts_ended') {
-    // Flush streaming text as final
-    if (streamingEl) {
-      streamingEl.classList.remove('streaming');
-      streamingEl = null;
-      streamingText = '';
-    }
+    if (streamingEl) { streamingEl.classList.remove('streaming'); streamingEl = null; streamingText = ''; }
   }
-  if (msg.type === 'tts_start' && msg.text) {
-    // Full sentence from tts_start — replace streaming
-    streamingText = '';
-    if (streamingEl) { streamingEl.remove(); streamingEl = null; }
-    addTranscript('teacher', msg.text);
+  if (msg.type === 'tts_start') {
+    // tts_start marks beginning of a new turn
+    newTurn = true;
   }
   if (msg.type === 'asr') {
     document.getElementById('user-text').textContent = msg.text || '';
-    // Flush any streaming teacher bubble before showing student text
     if (streamingEl) { streamingEl.classList.remove('streaming'); streamingEl = null; streamingText = ''; }
     if (msg.text) addTranscript('student', msg.text);
+    newTurn = true;  // student spoke, next teacher response is new turn
   }
 }
 
