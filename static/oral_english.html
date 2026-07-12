@@ -45,7 +45,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 <script>
 const API = window.location.origin;
 let authToken = localStorage.getItem('auth_token');
-let ws = null, audioCtx = null, isCalling = false, callStartTime = 0, timerInterval = null;
+let ws = null, audioCtx = null, playbackCtx = null, isCalling = false, callStartTime = 0, timerInterval = null;
 
 (async function(){
   if (!authToken) { location.href = '/'; return; }
@@ -61,8 +61,10 @@ let micStream = null, micNode = null;
 
 async function startCall(){
   try {
-    // Audio context for both capture and playback
+    // Audio context for mic capture (16kHz)
     audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    // Separate context for playback (24kHz from Volcengine TTS)
+    playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
 
     // Mic capture
     micStream = await navigator.mediaDevices.getUserMedia({
@@ -122,6 +124,7 @@ function endCall(){
   if (micNode) { micNode.disconnect(); micNode = null; }
   if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
+  if (playbackCtx) { playbackCtx.close().catch(()=>{}); playbackCtx = null; }
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   updateUI('idle');
 }
@@ -130,16 +133,16 @@ function endCall(){
 
 let audioChunks = 0;
 function playAudio(arraybuffer){
-  if (!audioCtx || audioCtx.state === 'closed') return;
+  if (!playbackCtx || playbackCtx.state === 'closed') return;
   audioChunks++;
   try {
     const pcm = new Int16Array(arraybuffer);
     if (audioChunks <= 3) console.log(`[voice] play audio #${audioChunks}: ${pcm.length} samples`);
-    const buffer = audioCtx.createBuffer(1, pcm.length, 24000);
+    const buffer = playbackCtx.createBuffer(1, pcm.length, 24000);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < pcm.length; i++) data[i] = pcm[i] / 32768;
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer; source.connect(audioCtx.destination); source.start();
+    const source = playbackCtx.createBufferSource();
+    source.buffer = buffer; source.connect(playbackCtx.destination); source.start();
   } catch(e) { console.error('[voice] play err:', e); }
 }
 
