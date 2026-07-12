@@ -38,12 +38,9 @@ def build_text_frame(event_id: int, session_id: str, payload: dict) -> bytes:
 
 
 def build_audio_frame(session_id: str, audio_data: bytes, sequence: int = 0) -> bytes:
-    # TaskRequest (event 200) — Full-client format with Raw serialization (NOT JSON!)
-    # header: msg_type=1 (Full-client), flags=0x04 (has event), serial=Raw(0x00)
-    sb = session_id.encode()
-    return (bytes([0x11, 0x14, 0x00, 0x00]) +  # Full-client, has_event, Raw serialization!
-            struct.pack(">I", 200) +              # TaskRequest
-            struct.pack(">I", len(sb)) + sb +     # session_id
+    # Audio-only (msg_type=2), Raw serialization, no event, no session_id, no sequence
+    # This is the format Volcengine actually accepts (verified by test_volc.py Test A)
+    return (bytes([0x11, 0x20, 0x00, 0x00]) +
             struct.pack(">I", len(audio_data)) + audio_data)
 
 
