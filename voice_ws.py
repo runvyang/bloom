@@ -212,7 +212,12 @@ async def handle_voice(ws):
                 if not frame: continue
                 eid = frame.get("event_id")
                 p = frame.get("json") or {}
-                print(f"[voice] <- eid={eid}, text={p.get('content',p.get('text',''))[:60]}")
+                has_audio = frame.get("audio") is not None
+                if has_audio:
+                    print(f"[voice] <- TTS audio: {len(frame['audio'])} bytes")
+                    await ws.send_bytes(frame["audio"])
+                elif eid is not None:
+                    print(f"[voice] <- eid={eid}, json={json.dumps(p, ensure_ascii=False)[:100]}")
 
                 if eid == 451:  # ASR
                     text = (p.get("results") or [{}])[0].get("text", "")
@@ -221,9 +226,6 @@ async def handle_voice(ws):
                     await ws.send_text(json.dumps({"type": "chat_text", "content": p.get("content", "")}, ensure_ascii=False))
                 elif eid == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
-                elif eid == 352:
-                    if frame.get("audio"):
-                        await ws.send_bytes(frame["audio"])
                 elif eid == 359:
                     await ws.send_text(json.dumps({"type": "tts_ended"}))
 
