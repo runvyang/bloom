@@ -469,12 +469,19 @@ async function showUnifiedSession(course){
     const startStr = (grp.firstTime || '').replace('T', ' ').slice(0, 19);
     const endStr = (grp.lastTime || '').replace('T', ' ').slice(0, 19);
     const userMsgs = grp.msgs.filter(m => m.role === 'user').length;
+    // Calculate duration
+    let duration = '';
+    try {
+      const d = (new Date(grp.lastTime) - new Date(grp.firstTime)) / 60000;
+      duration = d >= 1 ? `${Math.round(d)}分钟` : '<1分钟';
+    } catch(e) {}
 
     html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">`;
     html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">`;
     html += `<div>
       <span style="font-weight:600;font-size:13px">📅 第${sorted.length - si}次课</span>
-      <span style="font-size:10px;color:var(--text3);margin-left:8px">${startStr} → ${endStr}</span>
+      <span style="font-size:11px;color:var(--accent-hi);margin-left:8px;font-weight:600">⏱ ${duration}</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:6px">${startStr} → ${endStr}</span>
       <span style="font-size:9px;color:var(--text3);margin-left:6px;font-family:var(--mono)">${sid.slice(0,14)}…</span>
     </div>`;
     html += `<span style="font-size:10px;color:var(--text3)">${userMsgs}问${grp.msgs.length - userMsgs}答</span>`;
