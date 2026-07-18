@@ -507,8 +507,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <label>密码</label>
       <input id="auth-pass" type="password" placeholder="输入密码" autocomplete="current-password">
     </div>
-    <div class="modal-foot" style="justify-content:space-between">
-      <button class="btn-ghost" id="auth-toggle-btn" onclick="toggleAuthMode()">注册账号</button>
+    <div class="modal-foot" style="justify-content:flex-end">
       <button class="btn-sm" id="auth-submit-btn" onclick="submitAuth()">登录</button>
     </div>
   </div>
@@ -596,7 +595,6 @@ let cfg = { url: window.location.origin, sid: genSid(), course: 'math' };
 let busy = false;
 let msgCount = 0;
 let authToken = localStorage.getItem('auth_token') || null;
-let authMode = 'login';
 let username = '';
 
 // ─── Init ───────────────────────────────────────────────
@@ -726,19 +724,6 @@ function showAuthModal() {
   document.getElementById('auth-modal').style.display = 'flex';
   document.getElementById('auth-title').textContent = '登录';
   document.getElementById('auth-submit-btn').textContent = '登录';
-  document.getElementById('auth-toggle-btn').textContent = '注册账号';
-  document.getElementById('auth-err').style.display = 'none';
-  authMode = 'login';
-}
-
-function toggleAuthMode() {
-  authMode = (authMode === 'login') ? 'register' : 'login';
-  document.getElementById('auth-title').textContent =
-    authMode === 'login' ? '登录' : '注册';
-  document.getElementById('auth-submit-btn').textContent =
-    authMode === 'login' ? '登录' : '创建账号';
-  document.getElementById('auth-toggle-btn').textContent =
-    authMode === 'login' ? '注册账号' : '返回登录';
   document.getElementById('auth-err').style.display = 'none';
 }
 
@@ -753,9 +738,8 @@ async function submitAuth() {
     return;
   }
 
-  const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
-
   try {
+    const resp = await fetch(`${cfg.url}/auth/login`, {
     const resp = await fetch(`${cfg.url}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

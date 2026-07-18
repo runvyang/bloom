@@ -110,6 +110,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <div id="sidebar">
       <div class="sb-hdr">Students</div>
       <div id="student-list"></div>
+      <div style="padding:8px;border-top:1px solid var(--border)">
+        <button class="btn btn-accent" onclick="showCreateUser()" style="width:100%;font-size:11px">+ 创建用户</button>
+      </div>
+      <div id="create-user-form" style="display:none;padding:8px;border-top:1px solid var(--border)">
+        <input id="new-username" placeholder="用户名" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;margin-bottom:6px">
+        <input id="new-password" type="password" placeholder="密码（至少4位）" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;margin-bottom:6px">
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-accent" onclick="createUser()" style="flex:1;font-size:11px">创建</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('create-user-form').style.display='none'" style="font-size:11px">取消</button>
+        </div>
+        <div id="create-msg" style="font-size:10px;margin-top:4px"></div>
+      </div>
     </div>
     <div id="content">
       <div class="empty-state">
@@ -207,6 +219,37 @@ async function loadStudents(){
     el.addEventListener('mouseenter', () => { el.querySelector('button').style.opacity='1'; });
     el.addEventListener('mouseleave', () => { el.querySelector('button').style.opacity='0'; });
   });
+}
+
+function showCreateUser(){
+  document.getElementById('create-user-form').style.display = 'block';
+  document.getElementById('new-username').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('create-msg').textContent = '';
+}
+
+async function createUser(){
+  const u = document.getElementById('new-username').value.trim();
+  const p = document.getElementById('new-password').value;
+  const msg = document.getElementById('create-msg');
+  if (!u || p.length < 4) { msg.textContent = '❌ 用户名和密码（≥4位）必填'; msg.style.color = 'var(--red)'; return; }
+  try {
+    const r = await fetch(`${API}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      msg.textContent = `✅ 用户 ${u} 创建成功`;
+      msg.style.color = 'var(--green)';
+      document.getElementById('create-user-form').style.display = 'none';
+      loadStudents();
+    } else {
+      msg.textContent = '❌ ' + (d.detail || '失败');
+      msg.style.color = 'var(--red)';
+    }
+  } catch(e) { msg.textContent = '❌ 网络错误'; msg.style.color = 'var(--red)'; }
 }
 
 async function resetPassword(username){

@@ -73,12 +73,6 @@ class AuthRegisterReq(BaseModel):
     username: str
     password: str
 
-@app.post("/auth/register")
-def auth_register(req: AuthRegisterReq):
-    result = register_user(req.username, req.password)
-    if not result["success"]:
-        raise HTTPException(status_code=409, detail=result["error"])
-    return result
 
 class AuthLoginReq(BaseModel):
     username: str
@@ -129,6 +123,14 @@ def get_admin(authorization: str = Header(None)):
     if not validate_admin(token):
         raise HTTPException(status_code=401, detail="Invalid admin token")
     return True
+
+@app.post("/auth/register")
+def auth_register(req: AuthRegisterReq, admin: bool = Depends(get_admin)):
+    """Admin-only: create new user account."""
+    result = register_user(req.username, req.password)
+    if not result["success"]:
+        raise HTTPException(status_code=409, detail=result["error"])
+    return result
 
 @app.get("/admin/users")
 def admin_list_users(admin: bool = Depends(get_admin)):
