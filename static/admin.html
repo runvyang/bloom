@@ -480,7 +480,8 @@ async function showUnifiedSession(course){
     html += `<span style="font-size:10px;color:var(--text3)">${userMsgs}问${grp.msgs.length - userMsgs}答</span>`;
     html += `</div>`;
 
-    html += `<div style="display:flex;flex-direction:column;gap:4px">`;
+    const expanded = si === 0 ? 'block' : 'none';  // only latest session expanded
+    html += `<div style="display:${expanded};flex-direction:column;gap:4px">`;
     grp.msgs.forEach(m => {
       const role = m.role === 'user' ? 'user' : 'assistant';
       const time = m.time ? m.time.replace('T', ' ').slice(11, 19) : '';
