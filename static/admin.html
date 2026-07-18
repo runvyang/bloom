@@ -95,6 +95,37 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 /* Toast */
 .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 18px;font-size:13px;color:var(--text);z-index:9999;pointer-events:none;animation:ti .2s ease}
 @keyframes ti{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ─── Mobile responsive ──────────────────────────────── */
+@media(max-width:768px){
+  #hdr{padding:0 8px;height:42px;gap:6px}
+  .hdr-title{font-size:12px}
+  .btn{padding:5px 10px;font-size:11px}
+  #main{flex-direction:column}
+  #sidebar{width:100%;max-height:40vh;border-right:none;border-bottom:1px solid var(--border)}
+  #student-list{display:flex;flex-wrap:wrap;gap:4px;padding:6px;overflow-y:auto}
+  .student-item{font-size:11px;padding:8px 10px;flex-shrink:0;white-space:nowrap}
+  .sb-hdr{font-size:9px;padding:8px}
+  #content{padding:12px;gap:10px}
+  .tab{font-size:11px;padding:5px 10px}
+  .state-content{font-size:12px;padding:12px}
+  .session-item{padding:10px 12px;font-size:12px}
+  .session-item .sid{font-size:9px}
+  .msg-bubble{font-size:12px;padding:8px 12px}
+  #login-box{width:90vw;padding:20px}
+  .modal{width:95vw!important;max-height:90vh;padding:16px}
+  /* Stack create user form inputs */
+  #create-user-form input{font-size:14px;padding:8px}
+  #create-user-form .btn{font-size:12px;padding:8px}
+}
+@media(max-width:400px){
+  #sidebar{max-height:30vh}
+  #student-list{gap:2px}
+  .student-item{font-size:10px;padding:6px 8px}
+  .tab-bar{flex-wrap:wrap}
+  .tab{font-size:10px;padding:4px 8px}
+  #content{padding:8px;gap:8px}
+}
 </style>
 </head>
 <body>
