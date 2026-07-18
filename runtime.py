@@ -166,8 +166,7 @@ class ChatRuntime:
                 full_response += content
 
         if full_response:
-            append_to_session(user_id, course, "user", "[学生进入课堂]", session_id)
-            append_to_session(user_id, course, "assistant", full_response, session_id)
+            # Don't save checkin to session log — it's not meaningful interaction
             self._log(user_id, course, "[checkin]", full_response)
 
     def teach(self, session_id: str, user_input: str, user_id: str, course: str = "math"):

@@ -176,12 +176,34 @@ async def handle_voice(ws):
 
         # Track conversation for session log + eval
         transcript = []  # list of {role, content}
+        pending_teacher = []  # buffer teacher text until student actually responds
+        student_spoke = [False]
         last_teacher_text = [""]
         last_student_text = [""]
 
+        def flush_pending():
+            for t in pending_teacher:
+                transcript.append(t)
+                append_to_session(username, "oral_english", t["role"], t["content"], sid)
+            pending_teacher.clear()
+
         def save_turn(role, text):
-            if text.strip():
-                transcript.append({"role": role, "content": text.strip()})
+            if not text.strip(): return
+            entry = {"role": role, "content": text.strip()}
+            if role == "teacher":
+                if student_spoke[0]:
+                    # Student spoke — save immediately
+                    transcript.append(entry)
+                    append_to_session(username, "oral_english", role, text.strip(), sid)
+                else:
+                    # Buffer teacher text until student responds
+                    pending_teacher.append(entry)
+            else:
+                # Student spoke — flush any pending teacher turns first
+                if not student_spoke[0]:
+                    student_spoke[0] = True
+                    flush_pending()
+                transcript.append(entry)
                 append_to_session(username, "oral_english", role, text.strip(), sid)
 
         # Relay
@@ -236,10 +258,10 @@ async def handle_voice(ws):
                     content = p.get("content", "")
                     last_teacher_text[0] += content
                     await ws.send_text(json.dumps({"type": "chat_text", "content": content}, ensure_ascii=False))
-                elif evt == 359:  # TTS ended — flush teacher text
-                    if last_teacher_text[0].strip():
+                elif evt == 359:  # TTS ended — flush teacher text (only if student spoke)
+                    if last_teacher_text[0].strip() and student_spoke[0]:
                         save_turn("teacher", last_teacher_text[0])
-                        last_teacher_text[0] = ""
+                    last_teacher_text[0] = ""
                 elif evt == 350:
                     await ws.send_text(json.dumps({"type": "tts_start", "text": p.get("text", "")}, ensure_ascii=False))
 
@@ -265,8 +287,8 @@ async def handle_voice(ws):
             try: await volc_ws.send(build_text_frame(102, sid, {})); await volc_ws.close()
             except: pass
 
-        # Run eval if we have conversation data
-        if transcript:
+        # Run eval if student actually spoke
+        if student_spoke[0] and transcript:
             try:
                 await eval_conversation(username, transcript)
             except Exception as e:
