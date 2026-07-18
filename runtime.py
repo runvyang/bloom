@@ -18,6 +18,9 @@ init_storage()
 # Simple file cache: path -> (mtime, content)
 _file_cache = {}
 
+# Pending checkin greetings — flushed to session log only if student responds
+_pending_checkins = {}  # key: (user_id, course) -> greeting_text
+
 def _read_cached(path: str) -> str:
     mtime = os.path.getmtime(path)
     if path in _file_cache and _file_cache[path][0] == mtime:
@@ -166,13 +169,20 @@ class ChatRuntime:
                 full_response += content
 
         if full_response:
-            # Don't save checkin to session log — it's not meaningful interaction
+            # Buffer greeting — flushed to session log only if student responds
+            _pending_checkins[(user_id, course)] = full_response
             self._log(user_id, course, "[checkin]", full_response)
 
     def teach(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
         """Stream a teaching response to the student."""
 
         mark_session_active(user_id, course, session_id)
+
+        # Flush pending checkin greeting if student actually responds
+        key = (user_id, course)
+        if key in _pending_checkins:
+            append_to_session(user_id, course, "assistant", _pending_checkins.pop(key), session_id)
+
         append_to_session(user_id, course, "user", user_input, session_id)
         memory.add(user_id, user_input)
 
