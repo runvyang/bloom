@@ -15,6 +15,17 @@ llm = OpenRouterClient()
 memory = MemoryManager()
 init_storage()
 
+# Simple file cache: path -> (mtime, content)
+_file_cache = {}
+
+def _read_cached(path: str) -> str:
+    mtime = os.path.getmtime(path)
+    if path in _file_cache and _file_cache[path][0] == mtime:
+        return _file_cache[path][1]
+    content = read_file(path)
+    _file_cache[path] = (mtime, content)
+    return content
+
 
 def format_delta(delta: Dict) -> str:
     parts = [
@@ -87,15 +98,15 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     else:
         related_sessions = ""
 
-    # Load course prompt files
+    # Load course prompt files (with simple mtime cache)
     student_state_path = f"data/student/{user_id}/{course}_state.md"
     template_path = f"courses/{course}/student_state.md"
     if not os.path.exists(student_state_path):
         copy_file(template_path, student_state_path)
-    student_state = read_file(student_state_path)
-    world_model = read_file(f"courses/{course}/world_model.md")
-    plan_rules = read_file(f"courses/{course}/planner.md")
-    teacher_prompt = read_file(f"courses/{course}/teacher_prompt.md")
+    student_state = _read_cached(student_state_path)
+    world_model = _read_cached(f"courses/{course}/world_model.md")
+    plan_rules = _read_cached(f"courses/{course}/planner.md")
+    teacher_prompt = _read_cached(f"courses/{course}/teacher_prompt.md")
 
     return {
         "session_text": session_text,
