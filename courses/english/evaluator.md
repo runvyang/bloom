@@ -63,11 +63,6 @@ final_mastery = 0.5 * teacher_estimate + 0.3 * correctness_rate + 0.2 * consiste
 
 # 5. 英语专项评估规则
 
-### 口语评估
-- 流利度 + 准确性双重评分
-- 发音问题需标注具体音素
-- 鼓励输出 > 完美输出（初级阶段 tolerate errors）
-
 ### 写作评估
 - 分维度评分：内容/结构/语法/词汇
 - 拼写错误单独统计（高频词 vs 低频词）
