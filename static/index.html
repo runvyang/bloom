@@ -674,7 +674,7 @@ function initVoice(){
       transcript += event.results[i][0].transcript;
     }
     voiceText = transcript;
-    document.getElementById('ta').value = transcript;
+    document.getElementById('ta').value = voicePrefix + transcript;
     const ta = document.getElementById('ta');
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 180) + 'px';
@@ -693,12 +693,15 @@ function initVoice(){
   };
 }
 
+let voicePrefix = '';
+
 function startVoice(e){
   e.preventDefault();
   if (!recognition) initVoice();
   if (!recognition) { toast('当前浏览器不支持语音输入'); return; }
   voiceText = '';
-  document.getElementById('ta').value = '';
+  voicePrefix = document.getElementById('ta').value.trim();
+  if (voicePrefix) voicePrefix += ' ';
   try { recognition.start(); } catch(e) {}
   const btn = document.getElementById('mic-btn');
   btn.textContent = '🔴';
