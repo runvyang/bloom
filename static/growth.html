@@ -27,8 +27,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 #trees{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
 .tree-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;transition:all .3s;overflow:hidden}
 .tree-card:hover{border-color:var(--accent)}
-.tree-card h3{font-size:15px;margin-bottom:8px}
+.tree-card h3{font-size:15px;margin-bottom:8px;display:flex;align-items:center;justify-content:center;gap:6px}
+.tree-card .edit-btn{font-size:10px;color:var(--text3);cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;opacity:0;transition:opacity .15s}
+.tree-card:hover .edit-btn{opacity:1}
 .tree-card .meta{font-size:10px;color:var(--text3);margin-bottom:12px}
+
+/* Edit profile modal */
+#profile-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999}
+#profile-modal>div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:90%;max-width:400px}
+#profile-modal label{display:block;font-size:10px;font-weight:700;color:var(--text3);margin-bottom:4px;margin-top:12px}
+#profile-modal input,#profile-modal textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:13px;resize:vertical}
+#profile-modal textarea{min-height:60px}
+#profile-modal .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+#profile-modal .btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px}
+#profile-modal .btn-save{background:var(--accent);color:#fff}
+#profile-modal .btn-cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border)}
 .tree-svg{width:100%;max-width:200px;height:180px;margin:0 auto}
 .tree-card .emoji{font-size:36px;margin-bottom:4px}
 
@@ -170,7 +183,7 @@ function render(d){
 
     return `<div class="tree-card celebrate" style="animation-delay:${d.courses.indexOf(c)*0.15}s">
       <div class="emoji">${COURSES[c.course]?.emoji||'📝'}</div>
-      <h3>${COURSES[c.course]?.name||c.course}</h3>
+      <h3>${COURSES[c.course]?.name||c.course} <button class="edit-btn" onclick="editProfile('${c.course}')">✏️ 编辑背景</button></h3>
       <div class="meta">
         ${c.counts['精通']||0}精通 · ${c.counts['优秀']||0}优秀 · ${c.counts['通过']||0}通过 · ${c.counts['不及格']||0}薄弱
       </div>
@@ -213,6 +226,48 @@ function buildTree(course, pct, specials, branches){
     ${leaves.join('')}
     ${pct >= 10 ? `<text x="100" y="28" text-anchor="middle" font-size="16" filter="url(#glow)">${['🌱','🌿','🌳','🌲','🏆'][Math.min(4,Math.floor(pct/20))]}</text>` : ''}
   </svg>`;
+}
+
+// ─── Profile editing ────────────────────────────────────
+
+let currentEditCourse = null;
+
+async function editProfile(course){
+  currentEditCourse = course;
+  const token = localStorage.getItem('auth_token');
+  const r = await fetch(`${API}/profile/${course}`,{headers:{'Authorization':`Bearer ${token}`}});
+  const d = await r.json();
+
+  let html = `<div id="profile-modal"><div>
+    <h3 style="margin-bottom:12px">✏️ 编辑 ${COURSES[course]?.name||course} 学生背景</h3>
+    <label>年级</label>
+    <input id="prof-grade" value="${d.grade||''}" placeholder="例如：四年级（下学期）">
+    <label>学习背景</label>
+    <textarea id="prof-bg" placeholder="例如：校内平均分约90分，未参加过奥数竞赛">${d.background||''}</textarea>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="closeProfile()">取消</button>
+      <button class="btn btn-save" onclick="saveProfile()">保存</button>
+    </div>
+  </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('profile-modal').onclick = (e) => { if(e.target===document.getElementById('profile-modal')) closeProfile(); };
+}
+
+function closeProfile(){ document.getElementById('profile-modal')?.remove(); }
+
+async function saveProfile(){
+  const token = localStorage.getItem('auth_token');
+  await fetch(`${API}/profile/update`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+    body: JSON.stringify({
+      course: currentEditCourse,
+      grade: document.getElementById('prof-grade').value,
+      background: document.getElementById('prof-bg').value
+    })
+  });
+  closeProfile();
+  alert('✅ 背景已保存');
 }
 
 load();

@@ -107,6 +107,34 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     if not os.path.exists(student_state_path):
         copy_file(template_path, student_state_path)
     student_state = _read_cached(student_state_path)
+    # Inject user profile if available; auto-migrate from state header on first access
+    profile_path = f"data/student/{user_id}/profile.json"
+    profile = {}
+    if os.path.exists(profile_path):
+        profile = json.loads(read_file(profile_path))
+
+    # Auto-migrate: extract initial background from state header if not yet in profile
+    if not profile.get(course) and student_state:
+        import re
+        m = re.search(r'\*\*初始状态说明\*\*\s*\n((?:\s*-[^\n]+\n?)+)', student_state)
+        if m:
+            lines = m.group(1).strip().split('\n')
+            grade = ''; bg_parts = []
+            for line in lines:
+                line = line.strip('- ').strip()
+                if '年级' in line: grade = line
+                elif '奥数' in line or '经历' in line or '平均分' in line or '水平' in line or '编程' in line or '英语' in line or 'PET' in line or '目标' in line:
+                    bg_parts.append(line)
+            if grade or bg_parts:
+                profile[course] = {"grade": grade, "background": '; '.join(bg_parts)}
+                os.makedirs(os.path.dirname(profile_path), exist_ok=True)
+                from utils import write_file
+                write_file(profile_path, json.dumps(profile, ensure_ascii=False, indent=2))
+
+    cp = profile.get(course, {})
+    if cp.get("grade") or cp.get("background"):
+        bg = f"\n## 学生背景（当前）\n**年级**: {cp.get('grade', '')}\n**背景**: {cp.get('background', '')}\n"
+        student_state = bg + student_state
     world_model = _read_cached(f"courses/{course}/world_model.md")
     plan_rules = _read_cached(f"courses/{course}/planner.md")
     teacher_prompt = _read_cached(f"courses/{course}/teacher_prompt.md")

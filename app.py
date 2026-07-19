@@ -185,6 +185,57 @@ def admin_reset_password(req: ResetPasswordReq, admin: bool = Depends(get_admin)
     return result
 
 # =========================
+# PROFILE API
+# =========================
+class ProfileUpdateReq(BaseModel):
+    course: str
+    grade: str = ""
+    background: str = ""
+
+@app.get("/profile/{course}")
+def api_get_profile(course: str, user: dict = Depends(get_current_user)):
+    """Get student background for a course."""
+    username = user["username"]
+    profile_path = f"data/student/{username}/profile.json"
+    profile = {}
+    if os.path.exists(profile_path):
+        profile = json.loads(read_file(profile_path))
+    course_profile = profile.get(course, {})
+    return {"grade": course_profile.get("grade", ""), "background": course_profile.get("background", "")}
+
+@app.post("/profile/update")
+def api_update_profile(req: ProfileUpdateReq, user: dict = Depends(get_current_user)):
+    """Update student background for a course."""
+    username = user["username"]
+    profile_path = f"data/student/{username}/profile.json"
+    os.makedirs(os.path.dirname(profile_path), exist_ok=True)
+    profile = {}
+    if os.path.exists(profile_path):
+        profile = json.loads(read_file(profile_path))
+    profile[req.course] = {"grade": req.grade, "background": req.background}
+    from utils import write_file
+    write_file(profile_path, json.dumps(profile, ensure_ascii=False, indent=2))
+    # Also update the state file header
+    state_path = f"data/student/{username}/{req.course}_state.md"
+    if os.path.exists(state_path):
+        content = read_file(state_path)
+        # Replace or add ## 学生背景 section
+        bg_section = f"**年级**: {req.grade}\n**背景**: {req.background}"
+        if "## 学生背景" in content:
+            # Replace existing
+            import re
+            content = re.sub(r'## 学生背景\n.*?(?=\n## |\n---|\Z)', f'## 学生背景\n{bg_section}', content, flags=re.DOTALL)
+        else:
+            # Insert after title line
+            lines = content.split('\n')
+            insert_at = 2  # after title + blank line
+            lines.insert(insert_at, f'\n## 学生背景\n{bg_section}\n')
+            content = '\n'.join(lines)
+        from utils import write_file
+        write_file(state_path, content)
+    return {"success": True}
+
+# =========================
 # GROWTH API
 # =========================
 @app.get("/growth/data")
