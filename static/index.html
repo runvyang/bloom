@@ -614,7 +614,11 @@ async def chat_stream(req: ChatReq):
 
 <script>
 // ─── State ─────────────────────────────────────────────
-let cfg = { url: window.location.origin, sid: genSid(), course: 'math' };
+let cfg = { url: window.location.origin, sid: genSid(), course: localStorage.getItem('last_course') || 'math' };
+
+(function(){
+  document.getElementById('course-sel').value = cfg.course;
+})();
 let busy = false;
 let msgCount = 0;
 let authToken = localStorage.getItem('auth_token') || null;
@@ -1443,6 +1447,7 @@ function switchCourse(){
     return;
   }
   cfg.course = v;
+  localStorage.setItem('last_course', v);
   newSession();
   loadProgress();
   toast('已切换到 ' + cfg.course);
