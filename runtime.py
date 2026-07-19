@@ -141,7 +141,16 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     cp = profile.get(course, {})
     if cp.get("grade") or cp.get("background"):
         bg = f"\n## 学生背景（当前）\n**年级**: {cp.get('grade', '')}\n**背景**: {cp.get('background', '')}\n"
-        student_state = bg + student_state
+        # Insert bg AFTER course_map, BEFORE progress — keeps course_map as stable cache prefix
+        if student_progress.strip():
+            student_state = course_map + "\n" + bg + "\n" + student_progress
+        else:
+            student_state = course_map + "\n" + bg
+    else:
+        if student_progress.strip():
+            student_state = course_map + "\n" + student_progress
+        else:
+            student_state = course_map
     world_model = _read_cached(f"courses/{course}/world_model.md")
     plan_rules = _read_cached(f"courses/{course}/planner.md")
     teacher_prompt = _read_cached(f"courses/{course}/teacher_prompt.md")
