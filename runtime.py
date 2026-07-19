@@ -135,7 +135,6 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
             if grade or bg_parts:
                 profile[course] = {"grade": grade, "background": '; '.join(bg_parts)}
                 os.makedirs(os.path.dirname(profile_path), exist_ok=True)
-                from utils import write_file
                 write_file(profile_path, json.dumps(profile, ensure_ascii=False, indent=2))
 
     cp = profile.get(course, {})
