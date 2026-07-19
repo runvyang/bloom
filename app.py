@@ -10,6 +10,7 @@ from auth import get_user_states, get_user_state_content, list_user_sessions, ge
 from auth import list_unified_sessions, get_unified_session_content, reset_user_password
 import json
 import os
+from utils import read_file, copy_file
 
 app = FastAPI(title="智能教学助手API", version="1.0.0")
 
@@ -201,7 +202,6 @@ def api_growth_data(user: dict = Depends(get_current_user)):
         template = f"courses/{course}/student_state.md"
         if not os.path.exists(state_path):
             if os.path.exists(template):
-                from utils import copy_file
                 copy_file(template, state_path)
             else:
                 continue
