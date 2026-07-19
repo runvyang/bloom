@@ -216,7 +216,7 @@ def api_update_profile(req: ProfileUpdateReq, user: dict = Depends(get_current_u
     from utils import write_file
     write_file(profile_path, json.dumps(profile, ensure_ascii=False, indent=2))
     # Also update the state file header
-    state_path = f"data/student/{username}/{req.course}_state.md"
+    state_path = f"data/student/{username}/{req.course}_map.md"
     if os.path.exists(state_path):
         content = read_file(state_path)
         # Replace or add ## 学生背景 section
@@ -251,8 +251,8 @@ def api_growth_data(user: dict = Depends(get_current_user)):
 
     available = ["math", "chinese", "english", "coding"]
     for course in available:
-        state_path = f"data/student/{username}/{course}_state.md"
-        template = f"courses/{course}/student_state.md"
+        state_path = f"data/student/{username}/{course}_map.md"
+        template = f"courses/{course}/course_map.md"
         if not os.path.exists(state_path):
             if os.path.exists(template):
                 copy_file(template, state_path)

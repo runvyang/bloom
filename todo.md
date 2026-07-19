@@ -10,4 +10,6 @@
 - [x] support Coding
 - [x] support Chinese
 - [x] support oral english
-- [ ] fix english session
+- [x] fix english session
+- [x] growth system
+- [ ] user custom prompt

@@ -1,6 +1,6 @@
 from llm import OpenRouterClient
 from memory import MemoryManager
-from utils import read_file, append_file, copy_file
+from utils import read_file, append_file, copy_file, write_file
 from storage import save_learning_record, extract_knowledge_points, init_storage
 from session_store import (append_to_session, get_recent_rounds, get_compressed_mem,
                            mark_session_active, is_new_session, mark_checkin_sent,
@@ -101,12 +101,19 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     else:
         related_sessions = ""
 
-    # Load course prompt files (with simple mtime cache)
-    student_state_path = f"data/student/{user_id}/{course}_state.md"
-    template_path = f"courses/{course}/student_state.md"
-    if not os.path.exists(student_state_path):
-        copy_file(template_path, student_state_path)
-    student_state = _read_cached(student_state_path)
+    # Load course materials: course_map (readonly) + student_progress (deltas) + background (profile)
+    course_map_path = f"data/student/{user_id}/{course}_map.md"
+    template_path = f"courses/{course}/course_map.md"
+    if not os.path.exists(course_map_path):
+        copy_file(template_path, course_map_path)
+    course_map = _read_cached(course_map_path)
+
+    progress_path = f"data/student/{user_id}/{course}_progress.md"
+    if not os.path.exists(progress_path):
+        write_file(progress_path, "")
+    student_progress = read_file(progress_path)
+
+    student_state = course_map + "\n" + student_progress
     # Inject user profile if available; auto-migrate from state header on first access
     profile_path = f"data/student/{user_id}/profile.json"
     profile = {}
@@ -291,7 +298,7 @@ class ChatRuntime:
                 for i, d in enumerate(model_update_delta, 1):
                     delta_texts.append(f"{i}. {format_delta(d)}")
                 state_update = "\n\n# DELTA UPDATE\n" + "\n".join(delta_texts)
-                append_file(f"data/student/{user_id}/{course}_state.md", state_update)
+                append_file(f"data/student/{user_id}/{course}_progress.md", state_update)
                 print("receiving state updates: ", state_update)
             # Save to learning storage
             try:

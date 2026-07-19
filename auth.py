@@ -185,13 +185,13 @@ def list_users() -> list:
 
 
 def get_user_states(username: str) -> list:
-    """List state files for a user."""
+    """List course map files for a user."""
     states = []
     student_dir = f"data/student/{username}"
     if os.path.exists(student_dir):
         for f in sorted(os.listdir(student_dir)):
-            if f.endswith("_state.md"):
-                course = f.replace("_state.md", "")
+            if f.endswith("_map.md"):
+                course = f.replace("_map.md", "")
                 filepath = os.path.join(student_dir, f)
                 states.append({
                     "course": course,
@@ -203,12 +203,19 @@ def get_user_states(username: str) -> list:
 
 
 def get_user_state_content(username: str, course: str):
-    """Read a specific state file for a user."""
-    path = f"data/student/{username}/{course}_state.md"
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    return None
+    """Read course_map + progress for a user."""
+    parts = []
+    map_path = f"data/student/{username}/{course}_map.md"
+    prog_path = f"data/student/{username}/{course}_progress.md"
+    if os.path.exists(map_path):
+        with open(map_path, "r", encoding="utf-8") as f:
+            parts.append(f.read())
+    if os.path.exists(prog_path):
+        with open(prog_path, "r", encoding="utf-8") as f:
+            progress = f.read()
+            if progress.strip():
+                parts.append(progress)
+    return "\n\n".join(parts) if parts else None
 
 
 def list_user_sessions(username: str) -> list:

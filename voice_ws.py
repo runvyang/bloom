@@ -115,12 +115,12 @@ def get_prompt(username: str = "") -> str:
 
     # Student state
     if username:
-        state_path = f"data/student/{username}/oral_english_state.md"
-        template = "courses/oral_english/student_state.md"
-        if not os.path.exists(state_path) and os.path.exists(template):
-            copy_file(template, state_path)
-        if os.path.exists(state_path):
-            content = read_file(state_path)
+        map_path = f"data/student/{username}/oral_english_map.md"
+        template = "courses/oral_english/course_map.md"
+        if not os.path.exists(map_path) and os.path.exists(template):
+            copy_file(template, map_path)
+        if os.path.exists(map_path):
+            content = read_file(map_path)
             # Extract the most relevant part (first 300 chars after header)
             lines = content.split('\n')
             body = '\n'.join(lines[10:]) if len(lines) > 10 else content
@@ -305,10 +305,12 @@ async def eval_conversation(username: str, transcript: list):
     # Build eval prompt
     convo_text = "\n".join([f"{'学生' if m['role']=='student' else '老师'}: {m['content'][:200]}" for m in transcript[-10:]])
 
-    state_path = f"data/student/{username}/oral_english_state.md"
-    template = "courses/oral_english/student_state.md"
-    if not os.path.exists(state_path) and os.path.exists(template):
-        copy_file(template, state_path)
+    progress_path = f"data/student/{username}/oral_english_progress.md"
+    state_path = progress_path
+    template = "courses/oral_english/course_map.md"
+    map_path = f"data/student/{username}/oral_english_map.md"
+    if not os.path.exists(map_path) and os.path.exists(template):
+        copy_file(template, map_path)
     current_state = read_file(state_path) if os.path.exists(state_path) else ""
 
     prompt = f"""你是英语教学评估专家。根据以下口语课对话，评估学生的表现并更新学习状态。
@@ -347,7 +349,7 @@ async def eval_conversation(username: str, transcript: list):
             for u in updates:
                 delta += f"- {u['skill']}: {u['previous']} → {u['new']} ({u['reason']})\n"
 
-        append_file(state_path, delta)
+        append_file(progress_path, delta)
         print(f"[voice] Eval saved: {summary[:80]}")
     except Exception as e:
         print(f"[voice] Eval parse error: {e}")

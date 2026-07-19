@@ -3,7 +3,8 @@ data/history/*
 data/student/*
 data/auth.db
 data/student/*/sessions/*
-data/student/*/*_state.md
+data/student/*/*_map.md
+data/student/*/*_progress.md
 data/learning.db
 __pycache__/
 *.pyc

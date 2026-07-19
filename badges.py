@@ -91,7 +91,7 @@ def award_badge(user_id: str, badge_id: str) -> bool:
 
 def count_mastered_in_course(user_id: str, course: str) -> int:
     """Count mastered knowledge points in a course state file."""
-    state_path = f"data/student/{user_id}/{course}_state.md"
+    state_path = f"data/student/{user_id}/{course}_map.md"
     if not os.path.exists(state_path):
         return 0
     mastered = 0
