@@ -190,7 +190,9 @@ def admin_reset_password(req: ResetPasswordReq, admin: bool = Depends(get_admin)
 @app.get("/growth/data")
 def api_growth_data(user: dict = Depends(get_current_user)):
     """Aggregate learning progress across all courses for growth visualization."""
+    from badges import check_and_award
     username = user["username"]
+    badges_data = check_and_award(username)
     courses_info = []
     total_mastered = 0
     total_points = 0
@@ -253,7 +255,8 @@ def api_growth_data(user: dict = Depends(get_current_user)):
         "total_mastered": total_mastered,
         "total_points": total_points,
         "total_minutes": total_minutes,
-        "streak": streak
+        "streak": streak,
+        "badges": badges_data
     }
 
 # =========================

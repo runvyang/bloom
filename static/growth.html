@@ -66,6 +66,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <a href="/">← 返回</a>
   </div>
   <div id="stats"></div>
+  <div id="badges-section" style="margin-bottom:20px"></div>
   <div id="trees"></div>
 </div>
 
@@ -93,6 +94,10 @@ function render(d){
   const max = d.total_points || 1;
   const pct = Math.round(total/max*100) || 0;
   const hours = Math.round(d.total_minutes/60) || 0;
+  const bd = d.badges || {};
+  const points = bd.points || 0;
+  const earnedBadges = bd.badges || [];
+  const newBadges = bd.new_badges || [];
 
   document.getElementById('stats').innerHTML = `
     <div class="stat-card fire">
@@ -107,7 +112,53 @@ function render(d){
     <div class="stat-card">
       <div class="stat-num">${hours}h</div>
       <div class="stat-label">累计学习时长</div>
+    </div>
+    <div class="stat-card" style="background:linear-gradient(135deg,rgba(99,102,241,.1),transparent);border-color:rgba(99,102,241,.2)">
+      <div class="stat-num" style="color:var(--accent)">⭐ ${points}</div>
+      <div class="stat-label">积分 Points</div>
     </div>`;
+
+  // Badges section
+  let badgeHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:13px;font-weight:600">🏅 徽章 Badges</span><span style="font-size:10px;color:var(--text3)">${earnedBadges.length}/13</span></div>';
+  badgeHTML += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  earnedBadges.forEach(b => {
+    badgeHTML += `<div class="stat-card" style="padding:10px 14px;min-width:100px;flex:1;max-width:160px;${newBadges.some(nb=>nb.id===b.id)?'border-color:var(--yellow);animation:celebrate-in .5s ease':'opacity:.7'}">
+      <div style="font-size:22px">${b.icon}</div>
+      <div style="font-size:11px;font-weight:600;margin:2px 0">${b.name}</div>
+      <div style="font-size:9px;color:var(--text3)">${b.desc}</div>
+      ${newBadges.some(nb=>nb.id===b.id)?'<div style="font-size:9px;color:var(--yellow);margin-top:2px">🆕 新获得!</div>':''}
+    </div>`;
+  });
+  // Show locked badges
+  const allBadgeIds = bd.all_badge_ids || [];
+  const notEarned = [
+    {icon:'🌟',name:'初学者',desc:'学习满1小时'},
+    {icon:'🔭',name:'探索者',desc:'学习满10小时'},
+    {icon:'🎓',name:'学霸',desc:'学习满50小时'},
+    {icon:'👑',name:'大师',desc:'学习满100小时'},
+    {icon:'🔥',name:'自律达人',desc:'连续打卡7天'},
+    {icon:'💎',name:'毅力之星',desc:'连续打卡30天'},
+    {icon:'📐',name:'数学之星',desc:'数学精通10个知识点'},
+    {icon:'📖',name:'语文之星',desc:'语文精通10个知识点'},
+    {icon:'🇬🇧',name:'英语之星',desc:'英语精通10个知识点'},
+    {icon:'💻',name:'编程之星',desc:'编程精通5个知识点'},
+    {icon:'🏆',name:'全能选手',desc:'所有科目都有学习记录'},
+    {icon:'📚',name:'勤学苦练',desc:'累计完成100节课'},
+  ].filter((_,i) => !allBadgeIds.includes([
+    'learner_1h','learner_10h','learner_50h','learner_100h',
+    'streak_7d','streak_30d',
+    'math_10','chinese_10','english_10','coding_10',
+    'all_courses','first_100'
+  ][i]));
+  notEarned.forEach(b => {
+    badgeHTML += `<div class="stat-card" style="padding:10px 14px;min-width:100px;flex:1;max-width:160px;opacity:.25;filter:grayscale(1)">
+      <div style="font-size:22px">${b.icon}</div>
+      <div style="font-size:11px;font-weight:600;margin:2px 0">${b.name}</div>
+      <div style="font-size:9px;color:var(--text3)">${b.desc}</div>
+    </div>`;
+  });
+  badgeHTML += '</div>';
+  document.getElementById('badges-section').innerHTML = badgeHTML;
 
   // Trees
   document.getElementById('trees').innerHTML = d.courses.map(c => {
