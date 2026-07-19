@@ -312,7 +312,22 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
 .celebrate-sub{font-size:12px;color:var(--text2)}
 @keyframes celebrate-in{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
 
-@media(max-width:900px){#right-panel{display:none}}
+/* ─── Mini progress ring ─────────────────────────────── */
+.mini-ring{flex-shrink:0}
+.mini-ring text{font-size:8px;fill:var(--text2);text-anchor:middle;dominant-baseline:central}
+.progress-panel{padding:10px 14px;background:var(--surface2);border-radius:var(--r);margin-bottom:8px}
+.pp-title{font-size:10px;font-weight:700;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.pp-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;cursor:pointer}
+.pp-row:hover{color:var(--text)}
+.pp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pp-bar{flex:1;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.pp-bar-fill{height:100%;border-radius:2px}
+
+@media(max-width:768px){
+  #right-panel{position:fixed;right:0;top:48px;bottom:0;z-index:50;width:260px;transform:translateX(100%);transition:transform .25s ease}
+  #right-panel.open{transform:translateX(0)}
+  #mobile-drawer-toggle{display:flex!important;position:fixed;right:8px;bottom:80px;z-index:51;width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;border:none;cursor:pointer;font-size:16px;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(99,102,241,.3)}
+}
 
 /* ─── Status bar ──────────────────────────────────────── */
 #sbar{
@@ -418,8 +433,10 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
       <button class="btn-icon" onclick="clearChat()" title="清空消息">🗑</button>
       <span id="user-label" style="font-size:12px;color:var(--text2);margin-right:2px"></span>
       <button class="btn-ghost" onclick="logout()" style="font-size:11px;padding:3px 8px;display:none" id="logout-btn">退出</button>
+      <a href="/oral-english" title="口语练习" style="color:var(--text2);text-decoration:none;font-size:14px;padding:4px 8px;border:1px solid var(--border);border-radius:7px;transition:all .15s;line-height:1" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text2)'">🎙</a>
       <a href="/growth" style="color:var(--text2);text-decoration:none;font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:7px;transition:all .15s" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text2)'">🌱</a>
       <button class="btn-sm" onclick="openSettings()">设置</button>
+      <button id="mobile-drawer-toggle" style="display:none" onclick="toggleMobileDrawer()">📋</button>
     </div>
   </header>
 
@@ -455,10 +472,15 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
     <!-- Right panel: daily tasks -->
     <div id="right-panel">
       <div class="rp-inner" id="rp-inner">
+        <div id="progress-panel" class="progress-panel">
+          <div class="pp-title">📊 知识掌握</div>
+          <div id="progress-rows"></div>
+        </div>
         <div id="streak-area"></div>
         <div id="tasks-area">
           <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 今日任务</div>
           <div id="task-list" style="display:flex;flex-direction:column;gap:10px"></div>
+        <a href="/oral-english" style="display:block;text-align:center;padding:8px;margin-top:10px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600">🎙 开始口语练习</a>
         </div>
         <button class="cal-btn" onclick="openCalendar()">📅 学习日历</button>
       </div>
@@ -708,6 +730,7 @@ function checkAuth() {
         document.getElementById('logout-btn').style.display = '';
         setStatus('就绪');
         loadTasks();
+        loadProgress();
         doCheckin();
       } else {
         localStorage.removeItem('auth_token');
@@ -762,6 +785,7 @@ async function submitAuth() {
     document.getElementById('logout-btn').style.display = '';
     toast('欢迎回来，' + username + '！');
     loadTasks();
+    loadProgress();
     setTimeout(doCheckin, 500);
 
   } catch (err) {
@@ -834,6 +858,37 @@ async function doCheckin(){
 let timers = {};       // course -> intervalId
 let pausedTimers = {}; // course -> {remaining, elapsed, duration}
 let calendarYear, calendarMonth;
+
+function toggleMobileDrawer(){
+  document.getElementById('right-panel').classList.toggle('open');
+}
+
+function loadProgress(){
+  fetch(`${cfg.url}/growth/data`, {
+    headers: { 'Authorization': `Bearer ${authToken}` }
+  })
+  .then(r => r.json())
+  .then(d => {
+    const rows = document.getElementById('progress-rows');
+    if (!d.courses || !d.courses.length) { rows.innerHTML = '<div style="font-size:10px;color:var(--text3)">暂无数据</div>'; return; }
+    const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4'};
+    rows.innerHTML = d.courses.map(c => {
+      const pct = c.total > 0 ? Math.round(c.mastered/c.total*100) : 0;
+      return `<div class="pp-row" onclick="switchToCourse('${c.course}')" title="点击切换到${c.course}">
+        <div class="pp-dot" style="background:${colors[c.course]||'var(--accent)'}"></div>
+        <span style="width:50px;font-size:10px;color:var(--text3)">${c.course}</span>
+        <div class="pp-bar"><div class="pp-bar-fill" style="width:${pct}%;background:${colors[c.course]||'var(--accent)'}"></div></div>
+        <span style="font-size:10px;color:var(--text2);width:28px;text-align:right">${pct}%</span>
+      </div>`;
+    }).join('');
+  }).catch(() => {});
+}
+
+function switchToCourse(course){
+  document.getElementById('course-sel').value = course;
+  cfg.course = course; newSession();
+  toast('已切换到 ' + course);
+}
 
 function loadTasks(){
   fetch(`${cfg.url}/tasks/today`, {
@@ -1389,6 +1444,7 @@ function switchCourse(){
   }
   cfg.course = v;
   newSession();
+  loadProgress();
   toast('已切换到 ' + cfg.course);
 }
 
