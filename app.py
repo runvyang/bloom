@@ -380,6 +380,23 @@ def api_checkin(req: CheckinReq, user: dict = Depends(get_current_user)):
                              headers={"Cache-Control": "no-cache", "Connection": "keep-alive"})
 
 # =========================
+# HISTORY API
+# =========================
+@app.get("/chat/history")
+def api_chat_history(course: str = "math", user: dict = Depends(get_current_user)):
+    """Return last 10 rounds of conversation for a course."""
+    from session_store import get_recent_rounds
+    msgs = get_recent_rounds(user["username"], course, max_rounds=10)
+    # Filter out checkin markers and eval plan messages
+    filtered = []
+    for m in msgs:
+        content = m.get("content", "")
+        if "[学生进入课堂]" in content: continue
+        if "[教学计划]" in content: continue
+        filtered.append(m)
+    return {"messages": filtered}
+
+# =========================
 # CHAT API（实时教学）
 # =========================
 class ChatReq(BaseModel):

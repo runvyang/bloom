@@ -735,6 +735,7 @@ function checkAuth() {
         setStatus('就绪');
         loadTasks();
         loadProgress();
+        loadHistory();
         doCheckin();
       } else {
         localStorage.removeItem('auth_token');
@@ -790,6 +791,7 @@ async function submitAuth() {
     toast('欢迎回来，' + username + '！');
     loadTasks();
     loadProgress();
+    loadHistory();
     setTimeout(doCheckin, 500);
 
   } catch (err) {
@@ -813,6 +815,24 @@ function logout() {
   document.getElementById('auth-user').value = '';
   document.getElementById('auth-pass').value = '';
   showAuthModal();
+}
+
+// ─── Chat History ───────────────────────────────────────
+async function loadHistory(){
+  try {
+    const r = await fetch(`${cfg.url}/chat/history?course=${cfg.course}`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const d = await r.json();
+    if (d.messages && d.messages.length > 0) {
+      removeEmpty();
+      d.messages.forEach(m => {
+        const role = m.role === 'user' ? 'user' : 'ai';
+        addBubble(role, m.content);
+      });
+      scrollBot();
+    }
+  } catch(e) {}
 }
 
 // ─── Checkin ────────────────────────────────────────────
@@ -1450,6 +1470,7 @@ function switchCourse(){
   localStorage.setItem('last_course', v);
   newSession();
   loadProgress();
+  loadHistory();
   toast('已切换到 ' + cfg.course);
 }
 
