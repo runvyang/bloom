@@ -163,7 +163,7 @@ async def handle_voice(ws):
         ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
             "dialog": {"bot_name": "Teacher", "system_role": get_prompt(username),
-                       "speaking_style": "friendly", "extra": {"model": "1.2.1.1"}},
+                       "speaking_style": "friendly", "extra": {"model": "1.2.1.1", "recv_timeout": 120}},
             "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
                     "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000,
                                      "speech_rate": -10},
@@ -211,7 +211,9 @@ async def handle_voice(ws):
             n = 0
             while True:
                 try: data = await ws.receive()
-                except Exception: break
+                except Exception as e:
+                    print(f"[voice] browser disconnected: {type(e).__name__}: {e}")
+                    break
                 if "bytes" in data:
                     n += 1
                     await volc_ws.send(build_audio_frame(sid, data["bytes"]))
@@ -238,7 +240,9 @@ async def handle_voice(ws):
             while True:
                 try: raw = await asyncio.wait_for(volc_ws.recv(), timeout=60)
                 except asyncio.TimeoutError: continue
-                except Exception: break
+                except Exception as e:
+                    print(f"[voice] Volc disconnected: {type(e).__name__}: {e}")
+                    break
                 r = parse_response(raw)
                 evt = r.get("event"); p = r.get("payload_msg") or {}
                 if r.get("audio"): await ws.send_bytes(r["audio"])
