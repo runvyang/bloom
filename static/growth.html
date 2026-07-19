@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌱 Growth Forest</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0b0c15;--surface:#12131f;--surface2:#191a2a;--border:#252744;--accent:#6366f1;--text:#dde0f2;--text2:#8b8eaa;--text3:#4f5270;--green:#4ade80;--red:#f87171;--yellow:#fbbf24;--orange:#fb923c;--pink:#f472b6;--cyan:#22d3ee;--sans:system-ui,sans-serif}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden}
+#app{min-height:100vh;max-width:900px;margin:0 auto;padding:20px}
+
+/* Header */
+#hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+#hdr h1{font-size:22px;display:flex;align-items:center;gap:8px}
+#hdr a{color:var(--text3);text-decoration:none;font-size:13px}
+#hdr a:hover{color:var(--text)}
+
+/* Stats row */
+#stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.stat-num{font-size:28px;font-weight:800;line-height:1}
+.stat-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.stat-card.fire{border-color:rgba(251,191,36,.3);background:linear-gradient(135deg,rgba(251,191,36,.08),transparent)}
+.stat-card.fire .stat-num{color:var(--yellow)}
+
+/* Trees grid */
+#trees{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px}
+.tree-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;transition:all .3s;overflow:hidden}
+.tree-card:hover{border-color:var(--accent)}
+.tree-card h3{font-size:15px;margin-bottom:8px}
+.tree-card .meta{font-size:10px;color:var(--text3);margin-bottom:12px}
+.tree-svg{width:100%;max-width:200px;height:180px;margin:0 auto}
+.tree-card .emoji{font-size:36px;margin-bottom:4px}
+
+/* Tree SVG elements */
+.tree-trunk{fill:#8B6914;animation:grow-trunk .8s ease-out}
+.tree-trunk.m{fill:#8B6914}
+.tree-trunk.c{fill:#5B8C5A}
+.tree-trunk.e{fill:#4A7FB5}
+.tree-trunk.cd{fill:#6B4C8A}
+@keyframes grow-trunk{from{transform:scaleY(0);transform-origin:bottom}}
+.branch{fill:none;stroke:#6B8E23;stroke-width:3;stroke-linecap:round;animation:grow-branch .6s ease-out}
+@keyframes grow-branch{from{stroke-dashoffset:100;stroke-dasharray:100}}
+.leaf{animation:pop-leaf .4s ease-out}
+@keyframes pop-leaf{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+
+/* Progress bar */
+.progress-bar{height:4px;background:var(--surface2);border-radius:2px;margin-top:8px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;transition:width 1s ease}
+.progress-fill.math{background:linear-gradient(90deg,#fbbf24,#f59e0b)}
+.progress-fill.chinese{background:linear-gradient(90deg,#f472b6,#ec4899)}
+.progress-fill.english{background:linear-gradient(90deg,#6366f1,#4f46e5)}
+.progress-fill.coding{background:linear-gradient(90deg,#22d3ee,#06b6d4)}
+
+/* Streak celebration */
+.celebrate{animation:celebrate-in .5s ease}
+@keyframes celebrate-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+@media(max-width:600px){#stats{grid-template-columns:repeat(3,1fr);gap:6px}#trees{grid-template-columns:1fr}.stat-num{font-size:22px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hdr">
+    <h1>🌱 学习森林 Growth Forest</h1>
+    <a href="/">← 返回</a>
+  </div>
+  <div id="stats"></div>
+  <div id="trees"></div>
+</div>
+
+<script>
+const API = window.location.origin;
+const COURSES = {
+  math: {name:'Math',emoji:'📐',color:'math'},
+  chinese: {name:'Chinese',emoji:'📖',color:'chinese'},
+  english: {name:'English',emoji:'🇬🇧',color:'english'},
+  coding: {name:'Coding',emoji:'💻',color:'coding'}
+};
+
+async function load(){
+  const token = localStorage.getItem('auth_token');
+  if (!token) { window.location.href = '/'; return; }
+  const r = await fetch(`${API}/growth/data`,{headers:{'Authorization':`Bearer ${token}`}});
+  if (!r.ok) { window.location.href = '/'; return; }
+  const d = await r.json();
+  render(d);
+}
+
+function render(d){
+  // Stats
+  const total = d.courses.reduce((s,c)=>s+c.mastered,0);
+  const max = d.total_points || 1;
+  const pct = Math.round(total/max*100) || 0;
+  const hours = Math.round(d.total_minutes/60) || 0;
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card fire">
+      <div class="stat-num">${d.streak?.streak||0}🔥</div>
+      <div class="stat-label">连续打卡</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${total}/${max}</div>
+      <div class="stat-label">知识点掌握 (${pct}%)</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:var(--green)"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${hours}h</div>
+      <div class="stat-label">累计学习时长</div>
+    </div>`;
+
+  // Trees
+  document.getElementById('trees').innerHTML = d.courses.map(c => {
+    const pct = c.total > 0 ? Math.round(c.mastered/c.total*100) : 0;
+    const levels = ['精通','优秀','通过','不及格','未开始']; // specials first
+    const specials = (c.counts['精通']||0) + (c.counts['优秀']||0);
+    const treeHeight = Math.max(20, 30 + pct * 0.8);
+    const branchCount = Math.max(1, Math.floor(specials / 3));
+
+    return `<div class="tree-card celebrate" style="animation-delay:${d.courses.indexOf(c)*0.15}s">
+      <div class="emoji">${COURSES[c.course]?.emoji||'📝'}</div>
+      <h3>${COURSES[c.course]?.name||c.course}</h3>
+      <div class="meta">
+        ${c.counts['精通']||0}精通 · ${c.counts['优秀']||0}优秀 · ${c.counts['通过']||0}通过 · ${c.counts['不及格']||0}薄弱
+      </div>
+      ${buildTree(c.course, pct, specials, branchCount)}
+      <div class="progress-bar"><div class="progress-fill ${COURSES[c.course]?.color}" style="width:${pct}%"></div></div>
+      <div class="meta" style="margin-top:4px">${pct}% 已点亮</div>
+    </div>`;
+  }).join('');
+}
+
+function buildTree(course, pct, specials, branches){
+  const trunkH = 30 + pct * 0.6;
+  const trunkW = 8;
+
+  // Generate leaves based on progress
+  const leaves = [];
+  const leafCount = Math.min(specials * 2, 40);
+  const colors = course==='math'?['#fbbf24','#f59e0b','#f97316','#ef4444']:
+                 course==='chinese'?['#f472b6','#ec4899','#e11d48','#be185d']:
+                 course==='english'?['#6366f1','#818cf8','#4f46e5','#a78bfa']:
+                 ['#22d3ee','#06b6d4','#0ea5e9','#38bdf8'];
+
+  for (let i = 0; i < leafCount; i++) {
+    const angle = (Math.random() - 0.5) * Math.PI * 0.8;
+    const dist = 30 + Math.random() * (trunkH - 10);
+    const x = 100 + Math.sin(angle) * (20 + dist * 0.5);
+    const y = 160 - dist;
+    const size = 4 + Math.random() * 8;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const delay = Math.random() * 0.5;
+    leaves.push(`<ellipse cx="${x}" cy="${y}" rx="${size/2}" ry="${size}" fill="${color}" opacity="${0.5 + Math.random()*0.5}" transform="rotate(${Math.random()*60-30},${x},${y})" class="leaf" style="animation-delay:${delay}s"/>`);
+  }
+
+  // Trunk gradient
+  const trunkColors = {math:'#8B6914',chinese:'#5B8C5A',english:'#4A7FB5',coding:'#6B4C8A'};
+  const tc = trunkColors[course] || '#8B6914';
+
+  return `<svg viewBox="0 0 200 180" class="tree-svg">
+    <rect x="${100-trunkW/2}" y="${160-trunkH}" width="${trunkW}" height="${trunkH}" rx="4" fill="${tc}" class="tree-trunk"/>
+    ${leaves.join('')}
+    ${pct >= 10 ? `<text x="100" y="28" text-anchor="middle" font-size="16" filter="url(#glow)">${['🌱','🌿','🌳','🌲','🏆'][Math.min(4,Math.floor(pct/20))]}</text>` : ''}
+  </svg>`;
+}
+
+load();
+</script>
+</body>
+</html>

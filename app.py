@@ -54,6 +54,11 @@ def oral_english_page():
     """返回英语口语练习页面"""
     return FileResponse("static/oral_english.html")
 
+@app.get("/growth")
+def growth_page():
+    """返回成长可视化页面"""
+    return FileResponse("static/growth.html")
+
 # =========================
 # Auth dependency
 # =========================
@@ -177,6 +182,79 @@ def admin_reset_password(req: ResetPasswordReq, admin: bool = Depends(get_admin)
     if not result["success"]:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+# =========================
+# GROWTH API
+# =========================
+@app.get("/growth/data")
+def api_growth_data(user: dict = Depends(get_current_user)):
+    """Aggregate learning progress across all courses for growth visualization."""
+    username = user["username"]
+    courses_info = []
+    total_mastered = 0
+    total_points = 0
+    total_minutes = 0
+
+    available = ["math", "chinese", "english", "coding"]
+    for course in available:
+        state_path = f"data/student/{username}/{course}_state.md"
+        template = f"courses/{course}/student_state.md"
+        if not os.path.exists(state_path):
+            if os.path.exists(template):
+                from utils import copy_file
+                copy_file(template, state_path)
+            else:
+                continue
+
+        content = read_file(state_path)
+        # Count mastery levels
+        counts = {"未评估": 0, "不及格": 0, "通过": 0, "优秀": 0, "精通": 0, "未开始": 0}
+        for line in content.split('\n'):
+            line = line.strip()
+            for level in counts:
+                if line.endswith(f"| {level} |") or f"| {level} |" in line:
+                    counts[level] += 1
+
+        # "未评估" and "未开始" both count as not-yet-learned
+        learned = counts.get("不及格", 0) + counts.get("通过", 0) + counts.get("优秀", 0) + counts.get("精通", 0)
+        mastered = counts.get("精通", 0) + counts.get("优秀", 0)
+        total_points += learned + counts.get("未评估", 0) + counts.get("未开始", 0)
+        total_mastered += mastered
+
+        courses_info.append({
+            "course": course,
+            "counts": counts,
+            "learned": learned,
+            "mastered": mastered,
+            "total": learned + counts.get("未评估", 0) + counts.get("未开始", 0)
+        })
+
+    # Get learning stats from storage
+    from storage import get_streak_info
+    streak = get_streak_info(username)
+    total_minutes = streak.get("today_minutes", 0)
+
+    # Get total from all streaks
+    try:
+        from storage import get_conn
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT SUM(total_minutes) as t FROM learning_streaks WHERE user_id=?",
+            (username,)
+        ).fetchone()
+        if row and row["t"]:
+            total_minutes = int(row["t"])
+        conn.close()
+    except Exception:
+        pass
+
+    return {
+        "courses": courses_info,
+        "total_mastered": total_mastered,
+        "total_points": total_points,
+        "total_minutes": total_minutes,
+        "streak": streak
+    }
 
 # =========================
 # TASK & CALENDAR API
