@@ -101,14 +101,34 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     else:
         related_sessions = ""
 
-    # Load course materials: course_map (readonly) + student_progress (deltas) + background (profile)
+    # --- Migrate old _state.md to new _map.md + _progress.md ---
+    old_state_path = f"data/student/{user_id}/{course}_state.md"
     course_map_path = f"data/student/{user_id}/{course}_map.md"
+    progress_path = f"data/student/{user_id}/{course}_progress.md"
+
+    if os.path.exists(old_state_path) and not os.path.exists(progress_path):
+        old_content = read_file(old_state_path)
+        # Split at first "## DELTA UPDATE" or "# DELTA UPDATE"
+        import re
+        delta_match = re.search(r'\n*(#+\s*DELTA UPDATE.*)', old_content, re.DOTALL)
+        if delta_match:
+            deltas = delta_match.group(1).strip()
+            map_content = old_content[:delta_match.start()].strip()
+        else:
+            deltas = ""
+            map_content = old_content.strip()
+
+        write_file(course_map_path, map_content)
+        write_file(progress_path, deltas)
+        # Keep old file as backup (rename to .bak)
+        try: os.rename(old_state_path, old_state_path + ".bak")
+        except: pass
+
     template_path = f"courses/{course}/course_map.md"
     if not os.path.exists(course_map_path):
         copy_file(template_path, course_map_path)
     course_map = _read_cached(course_map_path)
 
-    progress_path = f"data/student/{user_id}/{course}_progress.md"
     if not os.path.exists(progress_path):
         write_file(progress_path, "")
     student_progress = read_file(progress_path)
