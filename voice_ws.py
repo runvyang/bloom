@@ -104,7 +104,7 @@ def parse_response(data: bytes):
 
 
 def get_prompt(username: str = "") -> str:
-    """Build system prompt including student's current state."""
+    """Build system prompt with course map + progress + recent sessions."""
     base = "You are a friendly English teacher helping a young Chinese student practice spoken English for the PET exam. Speak clearly at moderate speed. Encourage the student."
 
     # Course prompt
@@ -113,20 +113,37 @@ def get_prompt(username: str = "") -> str:
         with open(path, "r", encoding="utf-8") as f:
             base = f.read()[:400]
 
-    # Student state
     if username:
+        # Course map (knowledge points)
         map_path = f"data/student/{username}/oral_english_map.md"
         template = "courses/oral_english/course_map.md"
         if not os.path.exists(map_path) and os.path.exists(template):
             copy_file(template, map_path)
         if os.path.exists(map_path):
             content = read_file(map_path)
-            # Extract the most relevant part (first 300 chars after header)
             lines = content.split('\n')
             body = '\n'.join(lines[10:]) if len(lines) > 10 else content
-            base += f"\n\nStudent's current level:\n{body[:400]}"
+            base += f"\n\nStudent's skill levels:\n{body[:300]}"
 
-    return base[:1000]
+        # Progress (delta updates)
+        progress_path = f"data/student/{username}/oral_english_progress.md"
+        if os.path.exists(progress_path):
+            progress = read_file(progress_path)
+            if progress.strip():
+                # Take last 2 delta updates
+                deltas = progress.split("# DELTA UPDATE")
+                recent_deltas = deltas[-3:] if len(deltas) > 3 else deltas[1:] if len(deltas) > 1 else []
+                if recent_deltas:
+                    base += f"\n\nRecent progress:\n# DELTA UPDATE" + "# DELTA UPDATE".join(recent_deltas)[:400]
+
+        # Recent 10 sessions (brief)
+        from session_store import get_recent_rounds
+        recent = get_recent_rounds(username, "oral_english", max_rounds=10)
+        if recent:
+            convo = "\n".join([f"{'S' if m['role'] in ('student','user') else 'T'}: {m.get('content','')[:100]}" for m in recent[-20:]])
+            base += f"\n\nRecent conversations:\n{convo[:500]}"
+
+    return base[:2000]
 
 # ─── Main handler ───
 
