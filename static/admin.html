@@ -311,32 +311,28 @@ async function selectStudent(username){
 
 function renderCourseTabs(){
   const content = document.getElementById('content');
-  let html = '<div class="tab-bar">';
+  let html = '<div class="tab-bar" id="course-tabs">';
   COURSES.forEach(c => {
     html += `<button class="tab" onclick="selectCourse('${c}')" id="ctab-${c}">
       ${COURSE_EMOJI[c]||'📝'} ${c}
     </button>`;
   });
-  html += '</div><div id="detail-area"></div>';
+  html += '</div><div class="tab-bar" id="sub-tabs" style="margin-top:4px"></div><div id="detail-area"></div>';
   content.innerHTML = html;
-  // Auto-select first course
   selectCourse(COURSES[0]);
 }
 
 async function selectCourse(course){
   currentCourse = course;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  // Highlight course tab
+  document.querySelectorAll('#course-tabs .tab').forEach(t => t.classList.remove('active'));
   document.getElementById('ctab-' + course)?.classList.add('active');
 
-  // Show sub-tabs: course_map | progress | sessions
-  const content = document.getElementById('content');
-  content.innerHTML = `
-    <div class="tab-bar">
-      <button class="tab active" onclick="showCourseMap('${course}')" id="stab-map">📄 知识点</button>
-      <button class="tab" onclick="showProgress('${course}')" id="stab-prog">📝 进展</button>
-      <button class="tab" onclick="showCourseSessions('${course}')" id="stab-sess">💬 会话</button>
-    </div>
-    <div id="detail-area"></div>`;
+  // Show sub-tabs
+  document.getElementById('sub-tabs').innerHTML = `
+    <button class="tab active" onclick="showCourseMap('${course}')" id="stab-map">📄 知识点</button>
+    <button class="tab" onclick="showProgress('${course}')" id="stab-prog">📝 进展</button>
+    <button class="tab" onclick="showCourseSessions('${course}')" id="stab-sess">💬 会话</button>`;
   showCourseMap(course);
 }
 
@@ -366,8 +362,7 @@ async function showCourseSessions(course){
 }
 
 function setSubTabActive(id){
-  document.querySelectorAll('#detail-area').forEach(()=>{});
-  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#sub-tabs .tab').forEach(t => t.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
 }
 
