@@ -125,16 +125,12 @@ def get_prompt(username: str = "") -> str:
             body = '\n'.join(lines[10:]) if len(lines) > 10 else content
             base += f"\n\nStudent's skill levels:\n{body[:300]}"
 
-        # Progress (delta updates)
+        # Progress (all delta updates)
         progress_path = f"data/student/{username}/oral_english_progress.md"
         if os.path.exists(progress_path):
             progress = read_file(progress_path)
             if progress.strip():
-                # Take last 2 delta updates
-                deltas = progress.split("# DELTA UPDATE")
-                recent_deltas = deltas[-3:] if len(deltas) > 3 else deltas[1:] if len(deltas) > 1 else []
-                if recent_deltas:
-                    base += f"\n\nRecent progress:\n# DELTA UPDATE" + "# DELTA UPDATE".join(recent_deltas)[:400]
+                base += f"\n\nProgress:\n{progress[:800]}"
 
         # Recent 10 sessions (brief)
         from session_store import get_recent_rounds

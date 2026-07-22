@@ -21,6 +21,26 @@ _file_cache = {}
 # Pending checkin greetings — flushed to session log only if student responds
 _pending_checkins = {}  # key: (user_id, course) -> greeting_text
 
+def _merge_progress_to_map(course_map: str, progress: str) -> str:
+    """Use LLM to merge delta updates into the course map table, updating mastery levels."""
+    prompt = f"""你是一个数据合并助手。下面是一个学生知识点追踪表（Markdown表格）和一系列进展记录（DELTA UPDATE）。
+
+请根据所有 DELTA UPDATE 中的掌握度变化，更新表格中对应知识点的掌握程度。
+例如：如果一条DELTA说"除数是两位数的除法（困难）从不及格变为通过"，请找到表格中对应行，把"困难"列的值改为"通过"。
+
+只输出更新后的完整表格（从 # 标题到表格结束），不要输出任何解释。
+
+原始表格:
+{course_map}
+
+进展记录:
+{progress[:3000]}"""
+
+    llm = OpenRouterClient()
+    resp = llm.chat([{"role": "user", "content": prompt}], stream=False)
+    return resp.choices[0].message.content
+
+
 def _read_cached(path: str) -> str:
     mtime = os.path.getmtime(path)
     if path in _file_cache and _file_cache[path][0] == mtime:
@@ -132,6 +152,18 @@ def _build_context(user_id: str, course: str, user_input: str = "") -> dict:
     if not os.path.exists(progress_path):
         write_file(progress_path, "")
     student_progress = read_file(progress_path)
+
+    # Auto-merge progress into map if too many deltas (>10)
+    delta_count = student_progress.count("# DELTA UPDATE")
+    if delta_count > 10:
+        try:
+            merged = _merge_progress_to_map(course_map, student_progress)
+            write_file(course_map_path, merged)
+            write_file(progress_path, "")
+            course_map = merged
+            student_progress = ""
+        except Exception:
+            pass  # merge failure is non-fatal
 
     student_state = course_map + "\n" + student_progress
     # Inject user profile if available; auto-migrate from state header on first access
