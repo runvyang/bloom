@@ -853,7 +853,7 @@ function loadProgress(){
   .then(d => {
     const rows = document.getElementById('progress-rows');
     if (!d.courses || !d.courses.length) { rows.innerHTML = '<div style="font-size:10px;color:var(--text3)">暂无数据</div>'; return; }
-    const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4'};
+    const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4',oral_english:'#10b981'};
     rows.innerHTML = d.courses.map(c => {
       const pct = c.total > 0 ? Math.round(c.mastered/c.total*100) : 0;
       return `<div class="pp-row" onclick="switchToCourse('${c.course}')" title="点击切换到${c.course}">

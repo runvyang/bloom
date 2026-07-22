@@ -253,7 +253,7 @@ def api_growth_data(user: dict = Depends(get_current_user)):
     total_points = 0
     total_minutes = 0
 
-    available = ["math", "chinese", "english", "coding"]
+    available = ["math", "chinese", "english", "coding", "oral_english"]
     for course in available:
         state_path = f"data/student/{username}/{course}_map.md"
         template = f"courses/{course}/course_map.md"
