@@ -202,6 +202,16 @@ def get_user_states(username: str) -> list:
     return states
 
 
+def get_user_progress(username: str, course: str):
+    """Read just the progress file for a user."""
+    path = f"data/student/{username}/{course}_progress.md"
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+            return content if content.strip() else "(暂无进展记录)"
+    return "(暂无进展记录)"
+
+
 def get_user_state_content(username: str, course: str):
     """Read course_map + progress for a user."""
     parts = []

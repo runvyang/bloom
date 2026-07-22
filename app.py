@@ -7,7 +7,7 @@ from runtime import ChatRuntime
 from auth import init_db, register_user, authenticate_user, validate_session, invalidate_session
 from auth import admin_login, validate_admin, admin_logout, list_users
 from auth import get_user_states, get_user_state_content, list_user_sessions, get_user_session_content
-from auth import list_unified_sessions, get_unified_session_content, reset_user_password
+from auth import list_unified_sessions, get_unified_session_content, get_user_progress, reset_user_password
 import json
 import os
 from utils import read_file, copy_file
@@ -152,6 +152,10 @@ def admin_get_state_content(username: str, course: str, admin: bool = Depends(ge
     if content is None:
         raise HTTPException(status_code=404, detail="State file not found")
     return {"content": content, "course": course, "username": username}
+
+@app.get("/admin/progress/{username}/{course}")
+def admin_get_progress(username: str, course: str, admin: bool = Depends(get_admin)):
+    return {"content": get_user_progress(username, course), "course": course, "username": username}
 
 @app.get("/admin/sessions/{username}")
 def admin_list_user_sessions(username: str, admin: bool = Depends(get_admin)):

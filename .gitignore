@@ -2,6 +2,7 @@ data/sessions/*
 data/history/*
 data/student/*
 data/auth.db
+data/auth.db*
 data/student/*/sessions/*
 data/student/*/*_map.md
 data/student/*/*_progress.md

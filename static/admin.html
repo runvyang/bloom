@@ -181,9 +181,6 @@ const API = window.location.origin;
 let adminToken = localStorage.getItem('admin_token');
 let currentStudent = null;
 let currentTab = null;
-let stateFiles = [];
-let sessionFiles = [];
-let unifiedSessions = [];
 
 // Init
 (function(){
@@ -301,110 +298,77 @@ async function resetPassword(username){
   } catch(e) { alert('网络错误'); }
 }
 
+const COURSES = ['math','chinese','english','coding'];
+const COURSE_EMOJI = {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'};
+let currentCourse = null;
+
 async function selectStudent(username){
   currentStudent = username;
   document.querySelectorAll('.student-item').forEach(el => el.classList.remove('active'));
   document.getElementById('stu-' + username)?.classList.add('active');
-
-  // Load states
-  const sr = await fetch(`${API}/admin/state/${username}`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  const sd = await sr.json();
-  stateFiles = sd.states;
-
-  // Load sessions
-  const sessR = await fetch(`${API}/admin/sessions/${username}`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  const sessD = await sessR.json();
-  sessionFiles = sessD.sessions;
-
-  // Load unified sessions
-  const uR = await fetch(`${API}/admin/unified-sessions/${username}`, {
-    headers: { 'Authorization': `Bearer ${adminToken}` }
-  });
-  const uD = await uR.json();
-  unifiedSessions = uD.sessions;
-
-  renderTabs();
+  renderCourseTabs();
 }
 
-function renderTabs(){
+function renderCourseTabs(){
   const content = document.getElementById('content');
   let html = '<div class="tab-bar">';
-
-  // State tabs
-  stateFiles.forEach(s => {
-    html += `<button class="tab" onclick="showState('${s.course}')">
-      📄 ${s.course}
+  COURSES.forEach(c => {
+    html += `<button class="tab" onclick="selectCourse('${c}')" id="ctab-${c}">
+      ${COURSE_EMOJI[c]||'📝'} ${c}
     </button>`;
   });
-
-  // Session tab
-  html += `<button class="tab" onclick="showSessions()">
-    💬 旧Sessions <span class="tab-count">${sessionFiles.length}</span>
-  </button>`;
-
-  // Unified session tabs (one per course)
-  unifiedSessions.forEach(s => {
-    const emoji = {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[s.course] || '📝';
-    html += `<button class="tab" onclick="showUnifiedSession('${s.course}')">
-      ${emoji} ${s.course}会话
-    </button>`;
-  });
-
   html += '</div><div id="detail-area"></div>';
   content.innerHTML = html;
-
-  // Auto-select first state
-  if (stateFiles.length > 0) showState(stateFiles[0].course);
-  else showSessions();
+  // Auto-select first course
+  selectCourse(COURSES[0]);
 }
 
-async function showState(course){
-  currentTab = course;
+async function selectCourse(course){
+  currentCourse = course;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  // Find the matching tab button
-  Array.from(document.querySelectorAll('.tab')).forEach(t => {
-    if (t.textContent.trim().startsWith('📄 ' + course)) t.classList.add('active');
-  });
+  document.getElementById('ctab-' + course)?.classList.add('active');
 
+  // Show sub-tabs: course_map | progress | sessions
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="tab-bar">
+      <button class="tab active" onclick="showCourseMap('${course}')" id="stab-map">📄 知识点</button>
+      <button class="tab" onclick="showProgress('${course}')" id="stab-prog">📝 进展</button>
+      <button class="tab" onclick="showCourseSessions('${course}')" id="stab-sess">💬 会话</button>
+    </div>
+    <div id="detail-area"></div>`;
+  showCourseMap(course);
+}
+
+async function showCourseMap(course){
+  setSubTabActive('stab-map');
   const r = await fetch(`${API}/admin/state/${currentStudent}/${course}`, {
     headers: { 'Authorization': `Bearer ${adminToken}` }
   });
   const d = await r.json();
   document.getElementById('detail-area').innerHTML =
-    `<div class="state-content">${md(d.content)}</div>`;
+    `<div class="state-content">${md(d.content||'暂无')}</div>`;
 }
 
-function showSessions(){
-  currentTab = 'sessions';
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  Array.from(document.querySelectorAll('.tab')).forEach(t => {
-    if (t.textContent.includes('Sessions')) t.classList.add('active');
+async function showProgress(course){
+  setSubTabActive('stab-prog');
+  const r = await fetch(`${API}/admin/progress/${currentStudent}/${course}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
   });
+  const d = await r.json();
+  document.getElementById('detail-area').innerHTML =
+    `<div class="state-content">${md(d.content||'暂无进展')}</div>`;
+}
 
-  if (sessionFiles.length === 0) {
-    document.getElementById('detail-area').innerHTML =
-      '<div class="empty-state"><p style="color:var(--text3)">No sessions yet</p></div>';
-    return;
-  }
+async function showCourseSessions(course){
+  setSubTabActive('stab-sess');
+  showUnifiedSession(course);
+}
 
-  const html = '<div class="session-list">' + sessionFiles.map(s => {
-    const emoji = {math:'📐',chinese:'📖',english:'🇬🇧',coding:'💻'}[s.course] || '📝';
-    const time = s.modified ? s.modified.replace('T', ' ').slice(0,19) : '';
-    return `
-    <div class="session-item" onclick="showSession('${s.session_id}')">
-      <div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:2px">${emoji} ${s.course || 'unknown'} · <span style="color:var(--accent-hi)">${time}</span></div>
-        <div class="sid" style="font-size:9px;opacity:.5">${s.session_id.slice(0,30)}…</div>
-      </div>
-      <span style="color:var(--text3);font-size:11px">→</span>
-    </div>
-  `}).join('') + '</div>';
-
-  document.getElementById('detail-area').innerHTML = html;
+function setSubTabActive(id){
+  document.querySelectorAll('#detail-area').forEach(()=>{});
+  document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
 }
 
 async function showSession(sessionId){
@@ -437,11 +401,7 @@ async function showSession(sessionId){
 
 // Simple markdown-like rendering
 async function showUnifiedSession(course){
-  currentTab = 'unified-' + course;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  Array.from(document.querySelectorAll('.tab')).forEach(t => {
-    if (t.textContent.includes(course + '会话')) t.classList.add('active');
-  });
+  setSubTabActive('stab-sess');
 
   const r = await fetch(`${API}/admin/unified-session/${currentStudent}/${course}`, {
     headers: { 'Authorization': `Bearer ${adminToken}` }
