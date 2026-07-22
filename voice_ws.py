@@ -302,58 +302,60 @@ async def handle_voice(ws):
 
 
 async def eval_conversation(username: str, transcript: list):
-    """After a voice call, evaluate progress and update student state."""
+    """After a voice call, evaluate using standard DELTA UPDATE format."""
     if len(transcript) < 2:
         return
 
-    # Build eval prompt
     convo_text = "\n".join([f"{'学生' if m['role']=='student' else '老师'}: {m['content'][:200]}" for m in transcript[-10:]])
-
     progress_path = f"data/student/{username}/oral_english_progress.md"
-    state_path = progress_path
-    template = "courses/oral_english/course_map.md"
     map_path = f"data/student/{username}/oral_english_map.md"
+    template = "courses/oral_english/course_map.md"
     if not os.path.exists(map_path) and os.path.exists(template):
         copy_file(template, map_path)
-    current_state = read_file(state_path) if os.path.exists(state_path) else ""
+    current_map = read_file(map_path) if os.path.exists(map_path) else ""
+    current_progress = read_file(progress_path) if os.path.exists(progress_path) else ""
 
-    prompt = f"""你是英语教学评估专家。根据以下口语课对话，评估学生的表现并更新学习状态。
+    prompt = f"""你是英语口语教学评估专家。根据口语课对话评估学生表现。只记录本次确实发生变化的技能，无变化不记录。
 
-当前学生状态:
-{current_state[:1500]}
+课程知识点体系:
+{current_map[:1000]}
 
-本次口语课对话:
+已有进展:
+{current_progress[:800]}
+
+本次口语课:
 {convo_text}
 
-请用 JSON 格式输出评估结果（只输出 JSON，不要其他文字）:
-{{
-  "observations": ["观察1", "观察2"],
-  "skills_updated": [
-    {{"skill": "技能名", "previous": "之前等级", "new": "新等级", "reason": "原因"}}
-  ],
-  "next_focus": "下次课应该重点练习什么",
-  "summary": "一句话总结本次课"
-}}"""
+输出 JSON:
+{{"deltas":[{{"skill":"技能名","level":"Pre-A1/A1/A2/B1","previous":"未评估","new":"通过","reason":"原因"}}],"summary":"总结","next_focus":"下次重点"}}
+deltas可为空数组[]，skill名称必须来自课程知识点体系。"""
 
     llm = OpenRouterClient()
     try:
         resp = llm.chat([{"role": "user", "content": prompt}], stream=False)
-        result = json.loads(resp.choices[0].message.content)
+        content = resp.choices[0].message.content.strip()
+        if content.startswith("```"): content = content.split("\n",1)[1].rsplit("\n",1)[0]
+        result = json.loads(content)
 
-        # Append eval to state file
+        deltas = result.get("deltas", [])
         summary = result.get("summary", "")
         next_focus = result.get("next_focus", "")
-        updates = result.get("skills_updated", [])
+        if not deltas and not summary:
+            return
 
-        delta = f"\n\n## 口语课评估 ({__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')})\n"
-        delta += f"**总结**: {summary}\n"
-        delta += f"**下次重点**: {next_focus}\n"
-        if updates:
-            delta += "\n**技能变化**:\n"
-            for u in updates:
-                delta += f"- {u['skill']}: {u['previous']} → {u['new']} ({u['reason']})\n"
+        ts = __import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M")
+        if deltas:
+            delta_text = f"\n\n# DELTA UPDATE ({ts})\n"
+            for d in deltas:
+                prev = d.get('previous',''); new = d.get('new','')
+                delta_text += f"知识点：{d.get('skill','')}（{d.get('level','')}）\n"
+                delta_text += f"掌握度从'{prev}'变为'{new}'\n"
+                delta_text += f"原因：{d.get('reason','')}\n\n"
+        else:
+            delta_text = f"\n\n## 口语课记录 ({ts})\n**总结**: {summary}\n**下次重点**: {next_focus}\n"
 
-        append_file(progress_path, delta)
-        print(f"[voice] Eval saved: {summary[:80]}")
+        append_file(progress_path, delta_text)
+        print(f"[voice] Eval saved: {len(deltas)} deltas")
     except Exception as e:
         print(f"[voice] Eval parse error: {e}")
+
