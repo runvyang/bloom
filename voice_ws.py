@@ -6,7 +6,7 @@ import asyncio, struct, json, uuid, os, gzip, traceback
 import websockets
 from auth import validate_session
 from session_store import append_to_session
-from utils import read_file, append_file, copy_file
+from utils import read_file, append_file, copy_file, write_file
 from llm import OpenRouterClient
 
 VOLC_APP_ID = os.getenv("VOLC_APP_ID", "")
@@ -125,10 +125,20 @@ def get_prompt(username: str = "") -> str:
             body = '\n'.join(lines[10:]) if len(lines) > 10 else content
             base += f"\n\nStudent's skill levels:\n{body[:300]}"
 
-        # Progress (all delta updates)
+        # Progress (all delta updates) — auto-merge if >10
         progress_path = f"data/student/{username}/oral_english_progress.md"
         if os.path.exists(progress_path):
             progress = read_file(progress_path)
+            if progress.count("# DELTA UPDATE") > 10:
+                try:
+                    from runtime import _merge_progress_to_map
+                    map_content = read_file(map_path) if os.path.exists(map_path) else ""
+                    merged = _merge_progress_to_map(map_content, progress)
+                    write_file(map_path, merged)
+                    write_file(progress_path, "")
+                    progress = ""
+                except Exception:
+                    pass
             if progress.strip():
                 base += f"\n\nProgress:\n{progress[:800]}"
 
@@ -340,8 +350,8 @@ async def eval_conversation(username: str, transcript: list):
 {convo_text}
 
 输出 JSON:
-{{"deltas":[{{"skill":"技能名","level":"Pre-A1/A1/A2/B1","previous":"未评估","new":"通过","reason":"原因"}}],"summary":"总结","next_focus":"下次重点"}}
-deltas可为空数组[]，skill名称必须来自课程知识点体系。"""
+{{"deltas":[{{"skill":"技能名","level":"Pre-A1/A1/A2/B1","previous":"未评估","new":"通过","reason":"原因"}}]}}
+只输出真正发生变化的技能，无变化时deltas为空数组[]"""
 
     llm = OpenRouterClient()
     try:
@@ -351,21 +361,16 @@ deltas可为空数组[]，skill名称必须来自课程知识点体系。"""
         result = json.loads(content)
 
         deltas = result.get("deltas", [])
-        summary = result.get("summary", "")
-        next_focus = result.get("next_focus", "")
-        if not deltas and not summary:
+        if not deltas:
             return
 
         ts = __import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M")
-        if deltas:
-            delta_text = f"\n\n# DELTA UPDATE ({ts})\n"
-            for d in deltas:
-                prev = d.get('previous',''); new = d.get('new','')
-                delta_text += f"知识点：{d.get('skill','')}（{d.get('level','')}）\n"
-                delta_text += f"掌握度从'{prev}'变为'{new}'\n"
-                delta_text += f"原因：{d.get('reason','')}\n\n"
-        else:
-            delta_text = f"\n\n## 口语课记录 ({ts})\n**总结**: {summary}\n**下次重点**: {next_focus}\n"
+        delta_text = f"\n\n# DELTA UPDATE ({ts})\n"
+        for d in deltas:
+            prev = d.get('previous',''); new = d.get('new','')
+            delta_text += f"知识点：{d.get('skill','')}（{d.get('level','')}）\n"
+            delta_text += f"掌握度从'{prev}'变为'{new}'\n"
+            delta_text += f"原因：{d.get('reason','')}\n\n"
 
         append_file(progress_path, delta_text)
         print(f"[voice] Eval saved: {len(deltas)} deltas")
