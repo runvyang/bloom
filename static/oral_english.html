@@ -79,7 +79,24 @@ let ws = null, audioCtx = null, playbackCtx = null, isCalling = false, callStart
   if (!authToken) { location.href = '/'; return; }
   const r = await fetch(`${API}/auth/me`, { headers: { 'Authorization': `Bearer ${authToken}` } });
   if (!r.ok) { location.href = '/'; return; }
+  loadOralHistory();
 })();
+
+async function loadOralHistory(){
+  try {
+    const r = await fetch(`${API}/chat/history?course=oral_english`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const d = await r.json();
+    const msgs = d.messages || [];
+    // Show last 20 rounds
+    const recent = msgs.slice(-40); // ~20 rounds (user+assistant pairs)
+    recent.forEach(m => {
+      const role = m.role === 'user' ? 'student' : 'teacher';
+      addTranscript(role, m.content);
+    });
+  } catch(e) {}
+}
 
 async function toggleCall(){
   if (isCalling) { endCall(); } else { await startCall(); }
