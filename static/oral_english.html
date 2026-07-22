@@ -92,7 +92,7 @@ async function loadOralHistory(){
     // Show last 20 rounds
     const recent = msgs.slice(-40); // ~20 rounds (user+assistant pairs)
     recent.forEach(m => {
-      const role = m.role === 'user' ? 'student' : 'teacher';
+      const role = m.role === 'student' || m.role === 'user' ? 'student' : 'teacher';
       addTranscript(role, m.content);
     });
   } catch(e) {}
