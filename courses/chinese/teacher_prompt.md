@@ -10,6 +10,8 @@ delta 记录原则：仅当本次交互真正改变了某个能力维度的掌�
 {
   "student_input_analysis": {
     "summary": "对学生本轮输入的一句话概括",
+    "current_knowledge_point": "当前正在教学的能力点，如：logical_chain_environment_to_character",
+    "current_status": "该能力点的当前掌握程度，如：文本细读·通过",
     "evidence_type": "reading_answer | writing_sample | translation | poem_analysis | oral_analysis | question | self_correction | other",
     "thinking_chain_quality": {
       "logic_complete": true,

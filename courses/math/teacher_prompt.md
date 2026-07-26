@@ -12,10 +12,12 @@ delta 记录原则：仅当本次交互真正改变了某个知识点的掌握�
 {
   "student_input_analysis": {
     "summary": "对学生本轮输入的一句话概括",
+    "current_knowledge_point": "当前正在教学的知识点，如：除数是两位数的除法",
+    "current_status": "该知识点的当前掌握程度，如：困难·通过",
     "evidence_type": "正确答案 | 错误答案 | 部分正确 | 解释 | 提问 | 犹豫 | 自我纠正 | 其它",
-    "confidence": 0.85,                       // Agent 对该条证据反映学生真实状态的置信度 (0~1)
+    "confidence": 0.85,
     "detected_misconception": "具体误解描述，若无可为 null",
-    "emo_state_hint": "困惑 | 自信 | 犹豫 | 好奇 | 沮丧 | 中性" // 可选，从语气推断
+    "emo_state_hint": "困惑 | 自信 | 犹豫 | 好奇 | 沮丧 | 中性"
   },
   "model_update_delta": [
     // 仅发生变化的适合记录一条delta日志

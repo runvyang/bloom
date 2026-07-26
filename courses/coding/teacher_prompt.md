@@ -10,6 +10,8 @@ delta 记录原则：仅当本次交互真正改变了某个知识点的掌握�
 {
   "student_input_analysis": {
     "summary": "对学生本轮输入的一句话概括",
+    "current_knowledge_point": "当前正在教学的知识点，如：for_loop / bubble_sort",
+    "current_status": "该知识点的当前掌握程度，如：cpp_syntax·Level 3·通过",
     "evidence_type": "correct_code | buggy_code | compile_error | explanation | question | approach_description | debug_attempt | self_correction | other",
     "confidence": 0.85,
     "code_quality": {
