@@ -72,7 +72,7 @@
 <eval>
 当前知识点：第{tier}层·{ability_dimension}·{sub_skill}
 诊断：{对学生本轮表现的精简评估}
-当前状态：{previous_mastery}→{new_mastery}
+当前状态：'{previous_mastery}'→'{new_mastery}'
 <save>{true:仅当当前状态发生变化}|{false:状态没有发生变化}</save>
 下一步动作：{next_action}
 目标：{ability_dimension}·{sub_skill}
