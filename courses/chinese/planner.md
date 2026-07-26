@@ -82,4 +82,4 @@
 
 - `<save>true</save>` — 状态有变化或发现思维断点
 - `<save>false</save>` — 无变化
-- eval 块放在教学回复最后
+- eval 块放在教学回复最前面

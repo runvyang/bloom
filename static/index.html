@@ -1216,6 +1216,16 @@ async function tryStream(msg){
             el.innerHTML = esc(text).replace(/\n/g,'<br>') + '<span class="cur"></span>';
             scrollBot();
           }
+          if (ev.type === 'eval' && ev.content != null){
+            // Build collapsible block
+            const evalDiv = document.createElement('div');
+            evalDiv.className = 'eval-block';
+            evalDiv.innerHTML = `
+              <div class="eval-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent==='🔍 诊断'?'🔍 诊断':'🔍 诊断'" style="font-size:10px;color:var(--text3);cursor:pointer;padding:4px 0">🔍 诊断</div>
+              <div class="eval-content" style="display:none;font-size:11px;color:var(--text3);background:var(--surface2);padding:8px 10px;border-radius:6px;margin:4px 0;white-space:pre-wrap;line-height:1.5">${esc(ev.content)}</div>`;
+            el.appendChild(evalDiv);
+            scrollBot();
+          }
         } catch {
           // raw text chunk fallback
           text += raw;

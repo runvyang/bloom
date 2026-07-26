@@ -334,27 +334,35 @@ class ChatRuntime:
             ]
 
             stream = llm.chat(messages, reasoning=True)
+            eval_buffer = ""
             for event in stream:
                 content = event.choices[0].delta.content
                 if not content:
                     continue
                 full_response += content
 
-                # Detect <eval> start — from here, buffer but don't stream
                 if '<eval>' in content and not in_eval:
                     before, after = content.split('<eval>', 1)
-                    visible_response += before
-                    yield dict(type="text", content=before)
-                    # Send hidden eval marker to frontend
-                    yield dict(type="eval_start", content="")
+                    if before.strip():
+                        yield dict(type="text", content=before)
+                        visible_response += before
                     in_eval = True
-                    full_response = full_response  # keep full_response complete
+                    eval_buffer = after
                     continue
 
                 if in_eval:
                     if '</eval>' in content:
+                        before, after = content.split('</eval>', 1)
+                        eval_buffer += before
                         in_eval = False
-                        yield dict(type="eval_end", content="")
+                        # Send eval to frontend (collapsible)
+                        yield dict(type="eval", content=eval_buffer.strip())
+                        eval_buffer = ""
+                        if after.strip():
+                            yield dict(type="text", content=after)
+                            visible_response += after
+                        continue
+                    eval_buffer += content
                     continue
 
                 visible_response += content
