@@ -335,38 +335,69 @@ class ChatRuntime:
 
             stream = llm.chat(messages, reasoning=True)
             eval_buffer = ""
+            partial = ""  # for catching split tags
             for event in stream:
                 content = event.choices[0].delta.content
                 if not content:
                     continue
                 full_response += content
+                chunk = partial + content
+                partial = ""
 
-                if '<eval>' in content and not in_eval:
-                    before, after = content.split('<eval>', 1)
-                    if before.strip():
-                        yield dict(type="text", content=before)
-                        visible_response += before
-                    in_eval = True
-                    eval_buffer = after
-                    continue
-
-                if in_eval:
-                    if '</eval>' in content:
-                        before, after = content.split('</eval>', 1)
-                        eval_buffer += before
+                if not in_eval:
+                    # Check for <eval> tag (may be split across chunks)
+                    tag_start = chunk.find('<eval>')
+                    if tag_start >= 0:
+                        before = chunk[:tag_start]
+                        after = chunk[tag_start + 6:]  # len('<eval>') = 6
+                        if before.strip():
+                            yield dict(type="text", content=before)
+                            visible_response += before
+                        in_eval = True
+                        eval_buffer = after
+                        # Check if </eval> is in same chunk
+                        if '</eval>' in after:
+                            eval_text, rest = after.split('</eval>', 1)
+                            eval_buffer = eval_text
+                            in_eval = False
+                            yield dict(type="eval", content=eval_buffer.strip())
+                            eval_buffer = ""
+                            if rest.strip():
+                                yield dict(type="text", content=rest)
+                                visible_response += rest
+                        continue
+                    else:
+                        # No <eval> — check if chunk ends with partial tag
+                        for i in range(5, 0, -1):
+                            if chunk.endswith('<eval'[:i]):
+                                partial = '<eval'[:i]
+                                chunk = chunk[:-i]
+                                break
+                        if chunk.strip():
+                            yield dict(type="text", content=chunk)
+                            visible_response += chunk
+                else:
+                    # Inside eval — check for </eval>
+                    tag_end = chunk.find('</eval>')
+                    if tag_end >= 0:
+                        eval_buffer += chunk[:tag_end]
+                        after = chunk[tag_end + 7:]  # len('</eval>') = 7
                         in_eval = False
-                        # Send eval to frontend (collapsible)
                         yield dict(type="eval", content=eval_buffer.strip())
                         eval_buffer = ""
                         if after.strip():
                             yield dict(type="text", content=after)
                             visible_response += after
                         continue
-                    eval_buffer += content
-                    continue
-
-                visible_response += content
-                yield dict(type="text", content=content)
+                    else:
+                        # Check for partial </eval> tag
+                        for i in range(6, 0, -1):
+                            if chunk.endswith('</eval'[:i]):
+                                partial = '</eval'[:i]
+                                eval_buffer += chunk[:-i]
+                                break
+                        else:
+                            eval_buffer += chunk
 
         finally:
             if full_response:
