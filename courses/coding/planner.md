@@ -62,16 +62,12 @@
 
 ```
 <eval>
-当前知识点：{knowledge_area}·{knowledge_point}（Level {level}）
-当前状态：{previous_mastery}→{new_mastery}（如有变化）
-诊断：{简短评估}
-<save>true|false</save>
+当前知识点：第{tier}层·{ability_dimension}·{sub_skill}
+诊断：{对学生本轮表现的精简评估}
+当前状态：{previous_mastery}→{new_mastery}
+<save>{true:仅当当前状态发生变化}|{false:状态没有发生变化}</save>
 下一步动作：{next_action}
-目标：{knowledge_area}·{knowledge_point}（Level {level}）
-理由：{一句话}
+目标：{ability_dimension}·{sub_skill}
+理由：{一句话说明}
 </eval>
 ```
-
-- `<save>true</save>` — 状态有变化或发现新错误模式
-- `<save>false</save>` — 无变化
-- eval 块放在教学回复最前面

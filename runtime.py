@@ -422,7 +422,7 @@ class ChatRuntime:
                         append_file(progress_path, delta)
 
                     # Remove <eval> block from saved response
-                    clean_response = re.sub(r'<eval>.*?</eval>', '', full_response, flags=re.DOTALL).strip()
+                    clean_response = full_response
                 else:
                     clean_response = full_response
 

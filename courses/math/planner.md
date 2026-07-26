@@ -38,22 +38,16 @@
 
 ## 9. 教学回复格式（重要）
 
-每轮教学回复开始，必须包含一个 `<eval>` 块用于状态追踪。格式如下：
+每轮教学回复开始，必须包含一个 `<eval>` 块：
 
 ```
 <eval>
-当前知识点：{grade}·{module}·{knowledge_point}（{difficulty}）
-当前状态：{previous_mastery}→{new_mastery}（如有变化）
-诊断：{对学生本轮表现的简短评估，1-2句话}
-<save>true|false</save>
+当前知识点：第{tier}层·{ability_dimension}·{sub_skill}
+诊断：{对学生本轮表现的精简评估}
+当前状态：{previous_mastery}→{new_mastery}
+<save>{true:仅当当前状态发生变化}|{false:状态没有发生变化}</save>
 下一步动作：{next_action}
-目标：{grade}·{knowledge_point}（{difficulty}）
-理由：{一句话说明选择理由}
+目标：{ability_dimension}·{sub_skill}
+理由：{一句话说明}
 </eval>
 ```
-
-规则：
-- `<save>true</save>` — 仅当本轮教学确实改变了学生的掌握程度或发现新误解
-- `<save>false</save>` — 本次互动无状态变化
-- eval 块放在教学回复的**最前面**，之后才是正常的教学内容
-- 如果 save=true，后续系统会将本次诊断保存到进度文件
