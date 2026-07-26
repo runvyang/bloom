@@ -277,16 +277,14 @@ def api_growth_data(user: dict = Depends(get_current_user)):
         if os.path.exists(progress_path):
             prog = read_file(progress_path)
             for line in prog.split('\n'):
-                if "变为'精通'" in line or "变为'优秀'" in line or "变为\"精通\"" in line or "变为\"优秀\"" in line:
-                    # A delta upgraded something to mastered
-                    if "精通" in line:
-                        counts["精通"] = counts.get("精通", 0) + 1
-                    else:
-                        counts["优秀"] = counts.get("优秀", 0) + 1
+                if any(f"变为'{lv}'" in line or f'变为"{lv}"' in line for lv in ['精通','优秀','通过']):
+                    if "精通" in line: counts["精通"] = counts.get("精通", 0) + 1
+                    elif "优秀" in line: counts["优秀"] = counts.get("优秀", 0) + 1
+                    else: counts["通过"] = counts.get("通过", 0) + 1
 
-        # "未评估" and "未开始" both count as not-yet-learned
+        # Count 通过/优秀/精通 as "mastered" for encouraging progress display
         learned = counts.get("不及格", 0) + counts.get("通过", 0) + counts.get("优秀", 0) + counts.get("精通", 0)
-        mastered = counts.get("精通", 0) + counts.get("优秀", 0)
+        mastered = counts.get("精通", 0) + counts.get("优秀", 0) + counts.get("通过", 0)
         total_points += learned + counts.get("未评估", 0) + counts.get("未开始", 0)
         total_mastered += mastered
 
