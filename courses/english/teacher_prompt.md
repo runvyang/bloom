@@ -25,7 +25,7 @@ delta 记录原则：仅当本次交互真正改变了某个技能的掌握置�
   },
   "model_update_delta": [
     {
-      "skill_area": "reading | writing | listening | vocabulary | grammar",
+      "skill_area": "reading | writing | vocabulary | grammar",
       "sub_skill": "例如：past_tense_usage / pet_reading_part3 / daily_vocabulary",
       "cefr_level": "Pre-A1 | A1 | A2 | B1",
       "previous_mastery": "通过",
@@ -56,6 +56,5 @@ delta 记录原则：仅当本次交互真正改变了某个技能的掌握置�
 |------|-----------|-----------|
 | reading | main_idea / detail / inference / vocabulary_guess | Pre-A1 ~ B1 |
 | writing | sentence / paragraph / email / story / essay | Pre-A1 ~ B1 |
-| listening | gist / detail / speaker_attitude / note_taking | Pre-A1 ~ B1 |
 | vocabulary | daily / school / hobby / travel / abstract | Pre-A1 ~ B1 |
 | grammar | tense / sentence_structure / clause / modal_verb | Pre-A1 ~ B1 |

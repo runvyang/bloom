@@ -67,16 +67,11 @@ final_mastery = 0.5 * teacher_estimate + 0.3 * correctness_rate + 0.2 * consiste
 - 分维度评分：内容/结构/语法/词汇
 - 拼写错误单独统计（高频词 vs 低频词）
 
-### 听力评估
-- 区分"听懂大意"与"听懂细节"
-- 听不懂的原因分类：词汇不足 / 语速太快 / 口音不熟悉
-
----
 
 # 6. 决策原则
 
 - Principle 1: 宁可低估，不可高估
 - Principle 2: 宁可慢进，不可误进
 - Principle 3: 错误必须被证据支撑
-- Principle 4: 四项技能均衡优先于单项突进
-- Principle 5: 输出能力（说/写）的进步比输入能力（听/读）更有价值
+- Principle 4: 核心技能均衡优先于单项突进
+- Principle 5: 输出能力（写）的进步比输入能力（读）更有价值
