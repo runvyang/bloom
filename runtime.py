@@ -375,10 +375,6 @@ class ChatRuntime:
             print(f"got eval result ", eval_result)
             model_update_delta = eval_result["model_update_delta"]
             eval_text = merge_to_text(eval_result)
-            # Append plan as assistant message for context
-            plan_text = format_teaching_plan(eval_result["teaching_plan"])
-            append_to_session(user_id, course, "assistant",
-                              f"[教学计划] {plan_text}", session_id)
             print("successfully create eval result: ", eval_text)
             if len(model_update_delta) > 0:
                 delta_texts = []
