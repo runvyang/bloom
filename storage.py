@@ -336,18 +336,20 @@ def get_daily_detail(user_id: str, target_date: str) -> dict:
 # ─── Knowledge Points Extraction ──────────────────────────
 
 def extract_knowledge_points(eval_result: dict) -> list:
-    """Extract knowledge points from eval result delta."""
+    """Extract knowledge points from eval result delta (handles all course formats)."""
     points = []
     deltas = eval_result.get('model_update_delta', [])
     for d in deltas:
-        kp = d.get('knowledge_point', '')
+        # Try all possible K field names across courses
+        kp = (d.get('knowledge_point') or d.get('sub_skill') or
+              d.get('ability_dimension') or d.get('skill_area') or '')
         if kp:
             points.append(kp)
-    # Also from teaching plan target
     plan = eval_result.get('teaching_plan', {})
     target = plan.get('target', {})
     if target:
-        kp = target.get('knowledge_point', '')
+        kp = (target.get('knowledge_point') or target.get('sub_skill') or
+              target.get('ability_dimension') or target.get('skill_area') or '')
         if kp and kp not in points:
             points.append(kp)
     return points

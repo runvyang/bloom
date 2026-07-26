@@ -50,24 +50,51 @@ def _read_cached(path: str) -> str:
     return content
 
 
+def _delta_identity(delta: Dict) -> str:
+    """Build a human-readable identifier for a delta, handling all course formats."""
+    # Math: grade·module·knowledge_point (difficulty)
+    if 'grade' in delta:
+        return f"{delta['grade']}·{delta.get('module','')}·{delta['knowledge_point']}（{delta.get('difficulty','')}）"
+    # Chinese: tier + ability_dimension + sub_skill
+    if 'tier' in delta:
+        return f"第{delta['tier']}层·{delta.get('ability_dimension','')}·{delta.get('sub_skill','')}"
+    # English: skill_area + sub_skill (cefr_level)
+    if 'skill_area' in delta:
+        return f"{delta['skill_area']}·{delta.get('sub_skill','')}（{delta.get('cefr_level','')}）"
+    # Coding: knowledge_area + knowledge_point (level)
+    if 'knowledge_area' in delta:
+        return f"{delta['knowledge_area']}·{delta.get('knowledge_point','')}（Level {delta.get('level','')}）"
+    # Fallback: dump all non-meta fields
+    meta = {'previous_mastery','new_mastery','delta_reason','misconception_added','error_pattern_added','thinking_gap_found','timestamp'}
+    keys = [k for k in delta if k not in meta]
+    return '·'.join(f"{k}={delta[k]}" for k in keys[:3])
+
+
 def format_delta(delta: Dict) -> str:
+    identity = _delta_identity(delta)
     parts = [
-        f"知识点：{delta['grade']}·{delta.get('module', '')}·{delta['knowledge_point']}（{delta['difficulty']}）",
+        f"知识点：{identity}",
         f"掌握度从'{delta['previous_mastery']}'变为'{delta['new_mastery']}'",
         f"原因：{delta['delta_reason']}",
-        f"新增误解：{delta['misconception_added']}"
     ]
+    # Optional fields
+    for field, label in [('misconception_added','新增误解'),('error_pattern_added','错误模式'),('thinking_gap_found','思维断点')]:
+        val = delta.get(field)
+        if val:
+            parts.append(f"{label}：{val}")
     return "\n  ".join(parts)
 
 
 def format_teaching_plan(plan: Dict) -> str:
-    parts = [
-        f"下一步动作：{plan['next_action']}",
-        f"目标：{plan['target']['grade']}·{plan['target']['knowledge_point']}（{plan['target']['difficulty']}）",
-        f"理由：{plan['reason']}",
-        f"建议活动：{plan['proposed_activity']}",
-        f"优先级：{plan['priority']}（{'最高' if plan['priority']==1 else '正常' if plan['priority']==2 else '可推迟'}）",
-    ]
+    parts = [f"下一步动作：{plan.get('next_action','')}"]
+    target = plan.get('target', {})
+    if target:
+        tid = _delta_identity(target)
+        parts.append(f"目标：{tid}")
+    parts.append(f"理由：{plan.get('reason','')}")
+    parts.append(f"建议活动：{plan.get('proposed_activity','')}")
+    priority = plan.get('priority', 2)
+    parts.append(f"优先级：{priority}（{'最高' if priority==1 else '正常' if priority==2 else '可推迟'}）")
     return "\n".join(parts)
 
 
