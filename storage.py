@@ -336,20 +336,32 @@ def get_daily_detail(user_id: str, target_date: str) -> dict:
 # ─── Knowledge Points Extraction ──────────────────────────
 
 def extract_knowledge_points(eval_result: dict) -> list:
-    """Extract knowledge points from eval result delta (handles all course formats)."""
+    """Extract knowledge points — uses the primary ID field for each course.
+
+    Math:     knowledge_point
+    Chinese:  sub_skill (or ability_dimension)
+    English:  sub_skill (or skill_area)
+    Coding:   knowledge_point (or knowledge_area)
+    """
     points = []
     deltas = eval_result.get('model_update_delta', [])
     for d in deltas:
-        # Try all possible K field names across courses
-        kp = (d.get('knowledge_point') or d.get('sub_skill') or
-              d.get('ability_dimension') or d.get('skill_area') or '')
+        # Prefer the most specific field for each course
+        kp = (d.get('knowledge_point') or      # Math, Coding
+              d.get('sub_skill') or             # Chinese, English
+              d.get('ability_dimension') or     # Chinese (fallback)
+              d.get('skill_area') or            # English (fallback)
+              d.get('knowledge_area') or '')    # Coding (fallback)
         if kp:
             points.append(kp)
     plan = eval_result.get('teaching_plan', {})
     target = plan.get('target', {})
     if target:
-        kp = (target.get('knowledge_point') or target.get('sub_skill') or
-              target.get('ability_dimension') or target.get('skill_area') or '')
+        kp = (target.get('knowledge_point') or
+              target.get('sub_skill') or
+              target.get('ability_dimension') or
+              target.get('skill_area') or
+              target.get('knowledge_area') or '')
         if kp and kp not in points:
             points.append(kp)
     return points
