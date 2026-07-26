@@ -31,7 +31,7 @@ Only record facts. Examples:
 - confused "since" and "for" in present perfect
 - read PET part 3 passage with 80% comprehension
 - pronounced "th" as "s" consistently
-- showed confidence in speaking about hobbies
+- showed confidence in writing about hobbies
 - lost focus after 12 minutes
 
 Do not update mastery here. Only collect evidence.

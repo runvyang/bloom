@@ -12,7 +12,7 @@ delta 记录原则：仅当本次交互真正改变了某个技能的掌握置�
     "summary": "对学生本轮输入的一句话概括（英文或中文均可）",
     "current_knowledge_point": "当前正在教学的技能点，如：irregular_past_tense / pet_reading_part3",
     "current_status": "该技能点的当前掌握程度，如：grammar·A1·通过",
-    "evidence_type": "correct_answer | incorrect_answer | partial_correct | explanation | question | hesitation | self_correction | writing_sample | speaking_sample | other",
+    "evidence_type": "correct_answer | incorrect_answer | partial_correct | explanation | question | hesitation | self_correction | writing_sample | other",
     "confidence": 0.85,
     "error_pattern": "具体错误类型描述，如'一般过去时与现在完成时混淆'，若无可为 null",
     "language_quality": {
@@ -25,7 +25,7 @@ delta 记录原则：仅当本次交互真正改变了某个技能的掌握置�
   },
   "model_update_delta": [
     {
-      "skill_area": "reading | writing | listening | speaking | vocabulary | grammar",
+      "skill_area": "reading | writing | listening | vocabulary | grammar",
       "sub_skill": "例如：past_tense_usage / pet_reading_part3 / daily_vocabulary",
       "cefr_level": "Pre-A1 | A1 | A2 | B1",
       "previous_mastery": "通过",
@@ -57,6 +57,5 @@ delta 记录原则：仅当本次交互真正改变了某个技能的掌握置�
 | reading | main_idea / detail / inference / vocabulary_guess | Pre-A1 ~ B1 |
 | writing | sentence / paragraph / email / story / essay | Pre-A1 ~ B1 |
 | listening | gist / detail / speaker_attitude / note_taking | Pre-A1 ~ B1 |
-| speaking | pronunciation / fluency / interaction / monologue | Pre-A1 ~ B1 |
 | vocabulary | daily / school / hobby / travel / abstract | Pre-A1 ~ B1 |
 | grammar | tense / sentence_structure / clause / modal_verb | Pre-A1 ~ B1 |
