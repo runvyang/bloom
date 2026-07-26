@@ -264,13 +264,25 @@ def api_growth_data(user: dict = Depends(get_current_user)):
                 continue
 
         content = read_file(state_path)
-        # Count mastery levels
+        # Count mastery levels from course map
         counts = {"未评估": 0, "不及格": 0, "通过": 0, "优秀": 0, "精通": 0, "未开始": 0}
         for line in content.split('\n'):
             line = line.strip()
             for level in counts:
                 if line.endswith(f"| {level} |") or f"| {level} |" in line:
                     counts[level] += 1
+
+        # Also count from progress file (delta updates may not be merged yet)
+        progress_path = f"data/student/{username}/{course}_progress.md"
+        if os.path.exists(progress_path):
+            prog = read_file(progress_path)
+            for line in prog.split('\n'):
+                if "变为'精通'" in line or "变为'优秀'" in line or "变为\"精通\"" in line or "变为\"优秀\"" in line:
+                    # A delta upgraded something to mastered
+                    if "精通" in line:
+                        counts["精通"] = counts.get("精通", 0) + 1
+                    else:
+                        counts["优秀"] = counts.get("优秀", 0) + 1
 
         # "未评估" and "未开始" both count as not-yet-learned
         learned = counts.get("不及格", 0) + counts.get("通过", 0) + counts.get("优秀", 0) + counts.get("精通", 0)
