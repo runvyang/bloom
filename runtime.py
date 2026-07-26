@@ -310,6 +310,8 @@ class ChatRuntime:
 
         context = _build_context(user_id, course, user_input)
         full_response = ""
+        in_eval = False
+        visible_response = ""
 
         try:
             messages = [
@@ -334,14 +336,59 @@ class ChatRuntime:
             stream = llm.chat(messages, reasoning=True)
             for event in stream:
                 content = event.choices[0].delta.content
-                if content:
-                    yield dict(type="text", content=content)
-                    full_response += content
+                if not content:
+                    continue
+                full_response += content
+
+                # Detect <eval> start — from here, buffer but don't stream
+                if '<eval>' in content and not in_eval:
+                    before, after = content.split('<eval>', 1)
+                    visible_response += before
+                    yield dict(type="text", content=before)
+                    # Send hidden eval marker to frontend
+                    yield dict(type="eval_start", content="")
+                    in_eval = True
+                    full_response = full_response  # keep full_response complete
+                    continue
+
+                if in_eval:
+                    if '</eval>' in content:
+                        in_eval = False
+                        yield dict(type="eval_end", content="")
+                    continue
+
+                visible_response += content
+                yield dict(type="text", content=content)
 
         finally:
             if full_response:
-                append_to_session(user_id, course, "assistant", full_response, session_id)
-            self._log(user_id, course, user_input, full_response)
+                # Parse <eval> block and save if needed
+                import re
+                eval_match = re.search(r'<eval>(.*?)</eval>', full_response, re.DOTALL)
+                if eval_match:
+                    eval_content = eval_match.group(1).strip()
+                    save_match = re.search(r'<save>(true|false)</save>', eval_content)
+                    should_save = save_match and save_match.group(1) == 'true'
+                    if should_save:
+                        # Extract knowledge point and status info
+                        kp_match = re.search(r'当前知识点[：:]\s*(.+)', eval_content)
+                        status_match = re.search(r'当前状态[：:]\s*(.+)', eval_content)
+                        diag_match = re.search(r'诊断[：:]\s*(.+)', eval_content)
+                        kp = kp_match.group(1).strip() if kp_match else ""
+                        status = status_match.group(1).strip() if status_match else ""
+                        diagnosis = diag_match.group(1).strip() if diag_match else ""
+                        progress_path = f"data/student/{user_id}/{course}_progress.md"
+                        ts = __import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M")
+                        delta = f"\n\n# DELTA UPDATE ({ts})\n知识点：{kp}\n掌握度变化：{status}\n诊断：{diagnosis}\n"
+                        append_file(progress_path, delta)
+
+                    # Remove <eval> block from saved response
+                    clean_response = re.sub(r'<eval>.*?</eval>', '', full_response, flags=re.DOTALL).strip()
+                else:
+                    clean_response = full_response
+
+                append_to_session(user_id, course, "assistant", clean_response, session_id)
+            self._log(user_id, course, user_input, clean_response if full_response else "")
 
     def eval(self, session_id: str, user_input: str, user_id: str, course: str = "math"):
         """Evaluate the student's response and update the student model."""

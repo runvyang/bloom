@@ -149,6 +149,7 @@ def get_prompt(username: str = "") -> str:
             convo = "\n".join([f"{'S' if m['role'] in ('student','user') else 'T'}: {m.get('content','')[:100]}" for m in recent[-20:]])
             base += f"\n\nRecent conversations:\n{convo[:500]}"
 
+    print(base)
     return base[:2000]
 
 # ─── Main handler ───

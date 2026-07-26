@@ -63,3 +63,23 @@
   - 同样的思维过程，换一篇什么文章可以再次训练？
   - 学生的答题结构是否在下意识地进步？
 - 基于反思直接生成下一轮教学动作。
+
+## 10. 教学回复格式（重要）
+
+每轮教学回复末尾，必须包含一个 `<eval>` 块：
+
+```
+<eval>
+当前知识点：第{tier}层·{ability_dimension}·{sub_skill}
+当前状态：{previous_mastery}→{new_mastery}（如有变化）
+诊断：{对学生本轮表现的简短评估}
+<save>true|false</save>
+下一步动作：{next_action}
+目标：{ability_dimension}·{sub_skill}
+理由：{一句话说明}
+</eval>
+```
+
+- `<save>true</save>` — 状态有变化或发现思维断点
+- `<save>false</save>` — 无变化
+- eval 块放在教学回复最后

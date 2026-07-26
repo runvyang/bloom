@@ -417,8 +417,8 @@ def chat(req: ChatReq, background_tasks: BackgroundTasks, user: dict = Depends(g
             yield f"data: {json.dumps(chunk)}\n\n"
         yield "data: [DONE]\n\n"
 
-    background_tasks.add_task(chat_runtime.eval, req.session_id, req.message, user_id, req.course)
-    
+    # Eval is now inline (<eval> block in teach response), no separate eval task needed
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
