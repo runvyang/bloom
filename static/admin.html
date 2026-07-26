@@ -448,7 +448,7 @@ async function showUnifiedSession(course){
     html += `<div>
       <span style="font-weight:600;font-size:13px">📅 第${sorted.length - si}次课</span>
       <span style="font-size:11px;color:var(--accent-hi);margin-left:8px;font-weight:600">${startStr} → ${endStr}</span>
-      <span style="font-size:10px;color:var(--text3);margin-left:6px">⏱ ${duration}</span>
+      <span style="font-size:11px;color:var(--accent-hi);margin-left:6px;font-weight:600">⏱ ${duration}</span>
       <span style="font-size:9px;color:var(--text3);margin-left:6px;font-family:var(--mono)">${sid.slice(0,14)}…</span>
     </div>`;
     html += `<span style="font-size:10px;color:var(--text3)">${userMsgs}问${grp.msgs.length - userMsgs}答</span>`;
