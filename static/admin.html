@@ -330,10 +330,10 @@ async function selectCourse(course){
 
   // Show sub-tabs
   document.getElementById('sub-tabs').innerHTML = `
-    <button class="tab active" onclick="showCourseMap('${course}')" id="stab-map">📄 知识点</button>
-    <button class="tab" onclick="showProgress('${course}')" id="stab-prog">📝 进展</button>
-    <button class="tab" onclick="showCourseSessions('${course}')" id="stab-sess">💬 会话</button>`;
-  showCourseMap(course);
+    <button class="tab active" onclick="showCourseSessions('${course}')" id="stab-sess">💬 会话</button>
+    <button class="tab" onclick="showCourseMap('${course}')" id="stab-map">📄 知识点</button>
+    <button class="tab" onclick="showProgress('${course}')" id="stab-prog">📝 进展</button>`;
+  showCourseSessions(course);
 }
 
 async function showCourseMap(course){
@@ -421,8 +421,20 @@ async function showUnifiedSession(course){
   let html = `<div style="font-size:12px;font-weight:600;margin-bottom:12px">📋 ${course} 会话 · ${sorted.length} 次课程</div>`;
 
   sorted.forEach(([sid, grp], si) => {
-    const startStr = (grp.firstTime || '').replace('T', ' ').slice(0, 19);
-    const endStr = (grp.lastTime || '').replace('T', ' ').slice(0, 19);
+    const humanDate = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso); const now = new Date();
+      const diffMs = now - d; const diffDays = Math.floor(diffMs / 86400000);
+      if (diffDays === 0) return '今天 ' + d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+      if (diffDays === 1) return '昨天 ' + d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+      if (diffDays < 3) return diffDays + '天前';
+      if (diffDays < 7) return Math.floor(diffDays) + '天前';
+      if (diffDays < 30) return Math.floor(diffDays/7) + '周前';
+      if (diffDays < 365) return Math.floor(diffDays/30) + '个月前';
+      return d.toLocaleDateString('zh-CN');
+    };
+    const startStr = humanDate(grp.firstTime);
+    const endStr = humanDate(grp.lastTime);
     const userMsgs = grp.msgs.filter(m => m.role === 'user').length;
     // Calculate duration
     let duration = '';
