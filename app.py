@@ -159,12 +159,15 @@ def admin_get_progress(username: str, course: str, admin: bool = Depends(get_adm
 
 @app.get("/admin/course-mtimes/{username}")
 def admin_course_mtimes(username: str, admin: bool = Depends(get_admin)):
-    """Return mtime of each course's progress file for sorting."""
+    """Return max mtime of progress file + session log for each course."""
     import os as _os
     courses = []
     for c in ["math","chinese","english","coding","oral_english"]:
-        path = f"data/student/{username}/{c}_progress.md"
-        mtime = _os.path.getmtime(path) if _os.path.exists(path) else 0
+        mtime = 0
+        for suffix in ["_progress.md", "_session.log"]:
+            path = f"data/student/{username}/{c}{suffix}"
+            if _os.path.exists(path):
+                mtime = max(mtime, _os.path.getmtime(path))
         courses.append({"course": c, "mtime": mtime})
     courses.sort(key=lambda x: x["mtime"], reverse=True)
     return {"courses": courses}
