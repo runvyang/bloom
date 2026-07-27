@@ -157,6 +157,18 @@ def admin_get_state_content(username: str, course: str, admin: bool = Depends(ge
 def admin_get_progress(username: str, course: str, admin: bool = Depends(get_admin)):
     return {"content": get_user_progress(username, course), "course": course, "username": username}
 
+@app.get("/admin/course-mtimes/{username}")
+def admin_course_mtimes(username: str, admin: bool = Depends(get_admin)):
+    """Return mtime of each course's progress file for sorting."""
+    import os as _os
+    courses = []
+    for c in ["math","chinese","english","coding","oral_english"]:
+        path = f"data/student/{username}/{c}_progress.md"
+        mtime = _os.path.getmtime(path) if _os.path.exists(path) else 0
+        courses.append({"course": c, "mtime": mtime})
+    courses.sort(key=lambda x: x["mtime"], reverse=True)
+    return {"courses": courses}
+
 @app.get("/admin/sessions/{username}")
 def admin_list_user_sessions(username: str, admin: bool = Depends(get_admin)):
     return {"sessions": list_user_sessions(username)}

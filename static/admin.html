@@ -306,20 +306,38 @@ async function selectStudent(username){
   currentStudent = username;
   document.querySelectorAll('.student-item').forEach(el => el.classList.remove('active'));
   document.getElementById('stu-' + username)?.classList.add('active');
-  renderCourseTabs();
+  // Load course mtimes for sorting
+  const r = await fetch(`${API}/admin/course-mtimes/${username}`, {
+    headers: { 'Authorization': `Bearer ${adminToken}` }
+  });
+  const d = await r.json();
+  renderCourseTabs(d.courses);
 }
 
-function renderCourseTabs(){
+function renderCourseTabs(courseMtimes){
+  // Sort courses by mtime desc
+  const sorted = (courseMtimes || []).sort((a,b) => b.mtime - a.mtime);
+  const humanTime = (ts) => {
+    if (!ts || ts === 0) return '暂无';
+    const diff = (Date.now() - ts*1000) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff/60) + '分钟前';
+    if (diff < 86400) return Math.floor(diff/3600) + '小时前';
+    if (diff < 604800) return Math.floor(diff/86400) + '天前';
+    return new Date(ts*1000).toLocaleDateString('zh-CN');
+  };
+
   const content = document.getElementById('content');
   let html = '<div class="tab-bar" id="course-tabs">';
-  COURSES.forEach(c => {
-    html += `<button class="tab" onclick="selectCourse('${c}')" id="ctab-${c}">
-      ${COURSE_EMOJI[c]||'📝'} ${c}
+  sorted.forEach(c => {
+    html += `<button class="tab" onclick="selectCourse('${c.course}')" id="ctab-${c.course}">
+      ${COURSE_EMOJI[c.course]||'📝'} ${c.course}
+      <span style="font-size:9px;color:var(--text3);margin-left:4px">${humanTime(c.mtime)}</span>
     </button>`;
   });
   html += '</div><div class="tab-bar" id="sub-tabs" style="margin-top:4px"></div><div id="detail-area"></div>';
   content.innerHTML = html;
-  selectCourse(COURSES[0]);
+  if (sorted.length > 0) selectCourse(sorted[0].course);
 }
 
 async function selectCourse(course){
