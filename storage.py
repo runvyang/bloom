@@ -126,6 +126,7 @@ def init_storage():
             date TEXT NOT NULL,
             courses_completed INTEGER DEFAULT 0,
             total_minutes INTEGER DEFAULT 0,
+            total_courses INTEGER DEFAULT 2,
             UNIQUE(user_id, date)
         );
         CREATE INDEX IF NOT EXISTS idx_streaks_user ON learning_streaks(user_id);
@@ -308,10 +309,16 @@ def _update_streak(user_id: str, today: str):
     ).fetchone()
     completed = row['cnt'] if row else 0
     total_min = completed * 40
+    # Count total tasks for today
+    total_row = conn.execute(
+        "SELECT COUNT(*) as total FROM daily_tasks WHERE user_id=? AND date=?",
+        (user_id, today)
+    ).fetchone()
+    total_courses = total_row['total'] if total_row else 2
     conn.execute(
-        """INSERT OR REPLACE INTO learning_streaks (user_id, date, courses_completed, total_minutes)
-           VALUES (?, ?, ?, ?)""",
-        (user_id, today, completed, total_min)
+        """INSERT OR REPLACE INTO learning_streaks (user_id, date, courses_completed, total_minutes, total_courses)
+           VALUES (?, ?, ?, ?, ?)""",
+        (user_id, today, completed, total_min, total_courses)
     )
     conn.commit()
     conn.close()
@@ -382,14 +389,22 @@ def get_calendar(user_id: str, year: int, month: int) -> list:
     conn = get_conn()
     prefix = f"{year}-{month:02d}"
     rows = conn.execute(
-        """SELECT date, courses_completed, total_minutes
+        """SELECT date, courses_completed, total_minutes, total_courses
            FROM learning_streaks
            WHERE user_id=? AND date LIKE ?
            ORDER BY date""",
         (user_id, f"{prefix}%")
     ).fetchall()
+    result = []
+    for r in rows:
+        d = _row_to_dict(r)
+        # Count total courses for that day from schedule
+        day_idx = date.fromisoformat(d['date']).weekday()
+        sched = get_weekly_schedule(user_id)
+        d['total_courses'] = len(sched.get(str(day_idx), []))
+        result.append(d)
     conn.close()
-    return [_row_to_dict(r) for r in rows]
+    return result
 
 
 def get_daily_detail(user_id: str, target_date: str) -> dict:

@@ -479,7 +479,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
         </div>
         <div id="streak-area"></div>
         <div id="tasks-area">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 今日任务</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">📋 今日任务 <span id="day-label" style="color:var(--accent-hi)"></span></div>
           <div id="task-list" style="display:flex;flex-direction:column;gap:10px"></div>
         <a href="/oral-english" style="display:block;text-align:center;padding:8px;margin-top:10px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600">🎙 开始口语练习</a>
         </div>
@@ -883,6 +883,12 @@ function loadTasks(){
 }
 
 function renderTasks(tasks, streak){
+  // Day of week header
+  const days = ['周日','周一','周二','周三','周四','周五','周六'];
+  const today = new Date();
+  document.getElementById('day-label').textContent =
+    `· ${days[today.getDay()]} ${today.getMonth()+1}/${today.getDate()}`;
+
   // Streak
   document.getElementById('streak-area').innerHTML = `
     <div class="streak-badge">
@@ -1115,8 +1121,9 @@ function renderCalendar(){
       if (dd) cls += ' has-data';
       let dot = '';
       if (dd) {
-        const dotCls = dd.courses_completed >= 2 ? 'good' : 'partial';
-        dot = `<div class="cal-dot ${dotCls}"></div>`;
+        const ratio = dd.courses_completed / Math.max(1, dd.total_courses || 2);
+        const dotCls = ratio >= 1 ? 'good' : ratio > 0 ? 'partial' : '';
+        dot = `<div class="cal-dot ${dotCls}" style="width:4px;height:4px;margin-top:1px"></div>`;
       }
       html += `<div class="${cls}" onclick="showDayDetail('${ds}')">${d}${dot}</div>`;
     }
