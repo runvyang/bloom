@@ -17,13 +17,13 @@ def get_conn():
 # ─── Weekly Schedule ─────────────────────────────────────
 
 DEFAULT_WEEKLY_SCHEDULE = {
-    0: ["math", "english"],           # Monday: 数学 + 英语
-    1: ["chinese", "coding"],          # Tuesday: 语文 + 编程
-    2: ["math", "oral_english"],       # Wednesday: 数学 + 口语
-    3: ["chinese", "english"],         # Thursday: 语文 + 英语
-    4: ["coding", "learning", "oral_english"],  # Friday: 编程 + 学习科学 + 口语（轻松收尾）
-    5: [],  # Saturday (free)
-    6: [],  # Sunday (free)
+    0: ["math", "english"],            # Mon: 数学 + 英语
+    1: ["chinese", "coding"],           # Tue: 语文 + 编程
+    2: ["math", "oral_english"],        # Wed: 数学 + 口语
+    3: ["chinese", "english"],          # Thu: 语文 + 英语
+    4: ["coding", "learning"],          # Fri: 编程 + 学习科学
+    5: ["oral_english", "math"],        # Sat: 口语 + 数学（轻量复习）
+    6: ["learning", "english"],         # Sun: 学习科学 + 英语（收心准备）
 }
 
 def get_weekly_schedule(user_id: str) -> dict:
