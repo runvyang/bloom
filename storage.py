@@ -14,9 +14,82 @@ def get_conn():
     return conn
 
 
+# ─── Weekly Schedule ─────────────────────────────────────
+
+DEFAULT_WEEKLY_SCHEDULE = {
+    0: ["math", "math"],       # Monday
+    1: ["chinese", "chinese"],  # Tuesday
+    2: ["english", "english"],  # Wednesday
+    3: ["coding", "coding"],    # Thursday
+    4: ["oral_english", "learning"],  # Friday
+    5: [],  # Saturday (free)
+    6: [],  # Sunday (free)
+}
+
+def get_weekly_schedule(user_id: str) -> dict:
+    """Get user's weekly schedule. Returns dict of day_index -> [course, ...]"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT schedule_json FROM weekly_schedules WHERE user_id=?",
+        (user_id,)
+    ).fetchone()
+    conn.close()
+    if row and row["schedule_json"]:
+        return json.loads(row["schedule_json"])
+    # Return defaults
+    return {str(k): v for k, v in DEFAULT_WEEKLY_SCHEDULE.items()}
+
+def save_weekly_schedule(user_id: str, schedule: dict):
+    conn = get_conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO weekly_schedules (user_id, schedule_json) VALUES (?,?)",
+        (user_id, json.dumps(schedule, ensure_ascii=False))
+    )
+    conn.commit()
+    conn.close()
+
+def get_todays_courses(user_id: str) -> list:
+    """Get courses scheduled for today based on weekly schedule."""
+    today = date.today()
+    day_index = today.weekday()  # 0=Monday, 6=Sunday
+    schedule = get_weekly_schedule(user_id)
+    return schedule.get(str(day_index), [])
+
+def generate_daily_tasks_from_schedule(user_id: str) -> list:
+    """Generate today's tasks from the weekly schedule."""
+    today = date.today().isoformat()
+    courses = get_todays_courses(user_id)
+    if not courses:
+        return get_daily_tasks(user_id)  # fallback to old logic
+
+    conn = get_conn()
+    for course in courses:
+        conn.execute(
+            """INSERT OR IGNORE INTO daily_tasks
+               (user_id, course, date, task_order, status, duration_seconds)
+               VALUES (?, ?, ?, ?, 'pending', 2400)""",
+            (user_id, course, today, 0)
+        )
+    conn.commit()
+    # Update task_order based on schedule order
+    for i, course in enumerate(courses):
+        conn.execute(
+            "UPDATE daily_tasks SET task_order=? WHERE user_id=? AND date=? AND course=? AND status='pending'",
+            (i+1, user_id, today, course)
+        )
+    conn.commit()
+    conn.close()
+    return get_daily_tasks(user_id)
+
+
 def init_storage():
     conn = get_conn()
     conn.executescript("""
+        CREATE TABLE IF NOT EXISTS weekly_schedules (
+            user_id TEXT PRIMARY KEY,
+            schedule_json TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS learning_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,

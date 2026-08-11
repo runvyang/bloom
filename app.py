@@ -342,9 +342,10 @@ def api_growth_data(user: dict = Depends(get_current_user)):
 # =========================
 # TASK & CALENDAR API
 # =========================
-from storage import (generate_daily_tasks, get_daily_tasks, start_task,
-                     complete_task, heartbeat_task, get_streak_info,
-                     get_calendar, get_daily_detail, get_recent_records)
+from storage import (generate_daily_tasks, generate_daily_tasks_from_schedule,
+                     get_daily_tasks, start_task, complete_task, heartbeat_task,
+                     get_streak_info, get_calendar, get_daily_detail, get_recent_records,
+                     get_weekly_schedule, save_weekly_schedule)
 
 class TaskStartReq(BaseModel):
     course: str
@@ -352,9 +353,19 @@ class TaskStartReq(BaseModel):
 
 @app.get("/tasks/today")
 def api_daily_tasks(user: dict = Depends(get_current_user)):
-    tasks = generate_daily_tasks(user["username"])
+    tasks = generate_daily_tasks_from_schedule(user["username"])
     streak = get_streak_info(user["username"])
     return {"tasks": tasks, "streak": streak}
+
+@app.get("/tasks/schedule")
+def api_get_schedule(user: dict = Depends(get_current_user)):
+    return {"schedule": get_weekly_schedule(user["username"])}
+
+@app.post("/tasks/schedule")
+def api_save_schedule(req: dict, user: dict = Depends(get_current_user)):
+    schedule = req.get("schedule", {})
+    save_weekly_schedule(user["username"], schedule)
+    return {"success": True}
 
 @app.post("/tasks/start")
 def api_start_task(req: TaskStartReq, user: dict = Depends(get_current_user)):
