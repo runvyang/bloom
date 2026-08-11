@@ -17,11 +17,11 @@ def get_conn():
 # ─── Weekly Schedule ─────────────────────────────────────
 
 DEFAULT_WEEKLY_SCHEDULE = {
-    0: ["math", "math"],       # Monday
-    1: ["chinese", "chinese"],  # Tuesday
-    2: ["english", "english"],  # Wednesday
-    3: ["coding", "coding"],    # Thursday
-    4: ["oral_english", "learning"],  # Friday
+    0: ["math", "english"],           # Monday: 数学 + 英语
+    1: ["chinese", "coding"],          # Tuesday: 语文 + 编程
+    2: ["math", "oral_english"],       # Wednesday: 数学 + 口语
+    3: ["chinese", "english"],         # Thursday: 语文 + 英语
+    4: ["coding", "learning", "oral_english"],  # Friday: 编程 + 学习科学 + 口语（轻松收尾）
     5: [],  # Saturday (free)
     6: [],  # Sunday (free)
 }
