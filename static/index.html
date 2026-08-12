@@ -972,7 +972,7 @@ function startTimer(course, elapsed, duration){
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ course })
     })
-    .then(r => r.json())
+    .then(r => { if (!r.ok) console.log('[heartbeat] HTTP', r.status); return r.json(); })
     .then(d => {
       if (d.completed) {
         // Server says done — auto-complete
