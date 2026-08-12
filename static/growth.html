@@ -175,7 +175,7 @@ function render(d){
 
   // Trees
   document.getElementById('trees').innerHTML = d.courses.map(c => {
-    const pct = c.total > 0 ? Math.round(c.mastered/c.total*100) : 0;
+    const pct = c.blended_pct || (c.total > 0 ? Math.round(c.mastered/c.total*100) : 0);
     const levels = ['精通','优秀','通过','不及格','未开始']; // specials first
     const specials = (c.counts['精通']||0) + (c.counts['优秀']||0);
     const treeHeight = Math.max(20, 30 + pct * 0.8);

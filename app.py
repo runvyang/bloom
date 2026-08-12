@@ -304,19 +304,36 @@ def api_growth_data(user: dict = Depends(get_current_user)):
                     if f"变为'{label}'" in line or f'变为"{label}"' in line:
                         counts[label] = counts.get(label, 0) + 1
 
-        # Count mastered = 精通+优秀+通过+熟练+内化+Level4+Level5
+        # Knowledge-based progress
         mastered = sum(counts.get(l, 0) for l in mastered_labels)
-        learned = sum(counts.get(l, 0) for l in learned_labels)
         total_kps = sum(v for k, v in counts.items() if k in all_labels)
+
+        # Time-based progress (from completed tasks, 10h=600min as 100%)
+        from storage import get_conn as _gc
+        tc = _gc()
+        time_row = tc.execute(
+            "SELECT SUM(elapsed_seconds) as secs FROM daily_tasks WHERE user_id=? AND course=? AND status='completed'",
+            (username, course)
+        ).fetchone()
+        tc.close()
+        course_minutes = (time_row['secs'] or 0) / 60 if time_row else 0
+
+        # Blend: 50% knowledge + 50% time (capped at 100%)
+        kp_pct = min(1.0, mastered / max(1, total_kps))
+        time_pct = min(1.0, course_minutes / 600)  # 10 hours = full
+        blended_pct = int((kp_pct * 0.5 + time_pct * 0.5) * 100)
+
         total_points += total_kps
-        total_mastered += mastered
+        total_mastered += max(mastered, int(time_pct * total_kps))  # time gives at least partial "mastery"
 
         courses_info.append({
             "course": course,
             "counts": counts,
-            "learned": learned,
+            "learned": sum(counts.get(l, 0) for l in learned_labels),
             "mastered": mastered,
-            "total": total_kps
+            "total": total_kps,
+            "minutes": int(course_minutes),
+            "blended_pct": blended_pct
         })
 
     # Get learning stats from storage

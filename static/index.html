@@ -855,8 +855,8 @@ function loadProgress(){
     if (!d.courses || !d.courses.length) { rows.innerHTML = '<div style="font-size:10px;color:var(--text3)">暂无数据</div>'; return; }
     const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4',oral_english:'#10b981',learning:'#a855f7'};
     rows.innerHTML = d.courses.map(c => {
-      const pct = c.total > 0 ? Math.round(c.mastered/c.total*100) : 0;
-      return `<div class="pp-row" onclick="switchToCourse('${c.course}')" title="点击切换到${c.course}">
+      const pct = c.blended_pct || (c.total > 0 ? Math.round(c.mastered/c.total*100) : 0);
+      return `<div class="pp-row" onclick="switchToCourse('${c.course}')" title="知识点: ${Math.round((c.mastered||0)/Math.max(1,c.total||1)*100)}% · 学习: ${c.minutes||0}分钟">
         <div class="pp-dot" style="background:${colors[c.course]||'var(--accent)'}"></div>
         <span style="width:50px;font-size:10px;color:var(--text3)">${c.course}</span>
         <div class="pp-bar"><div class="pp-bar-fill" style="width:${pct}%;background:${colors[c.course]||'var(--accent)'}"></div></div>
