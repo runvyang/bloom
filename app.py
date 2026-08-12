@@ -279,28 +279,36 @@ def api_growth_data(user: dict = Depends(get_current_user)):
                 continue
 
         content = read_file(state_path)
-        # Count mastery levels from course map
-        counts = {"未评估": 0, "不及格": 0, "通过": 0, "优秀": 0, "精通": 0, "未开始": 0}
+        # Detect what mastery labels this course uses
+        all_labels = ["未评估", "不及格", "通过", "优秀", "精通", "未开始",
+                      "未接触", "接触中", "发展中", "熟练", "内化",
+                      "Level 0", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5"]
+        # Mastered labels for counting progress
+        mastered_labels = {"精通", "优秀", "通过", "熟练", "内化", "Level 4", "Level 5"}
+        learned_labels = mastered_labels | {"不及格", "发展中", "Level 3"}
+
+        counts = {}
         for line in content.split('\n'):
             line = line.strip()
-            for level in counts:
-                if line.endswith(f"| {level} |") or f"| {level} |" in line:
-                    counts[level] += 1
+            if '|' not in line: continue
+            for label in all_labels:
+                if f"| {label} |" in line or f"| {label} " in line:
+                    counts[label] = counts.get(label, 0) + 1
 
-        # Also count from progress file (delta updates may not be merged yet)
+        # Also count from progress file
         progress_path = f"data/student/{username}/{course}_progress.md"
         if os.path.exists(progress_path):
             prog = read_file(progress_path)
             for line in prog.split('\n'):
-                if any(f"变为'{lv}'" in line or f'变为"{lv}"' in line for lv in ['精通','优秀','通过']):
-                    if "精通" in line: counts["精通"] = counts.get("精通", 0) + 1
-                    elif "优秀" in line: counts["优秀"] = counts.get("优秀", 0) + 1
-                    else: counts["通过"] = counts.get("通过", 0) + 1
+                for label in mastered_labels:
+                    if f"变为'{label}'" in line or f'变为"{label}"' in line:
+                        counts[label] = counts.get(label, 0) + 1
 
-        # Count 通过/优秀/精通 as "mastered" for encouraging progress display
-        learned = counts.get("不及格", 0) + counts.get("通过", 0) + counts.get("优秀", 0) + counts.get("精通", 0)
-        mastered = counts.get("精通", 0) + counts.get("优秀", 0) + counts.get("通过", 0)
-        total_points += learned + counts.get("未评估", 0) + counts.get("未开始", 0)
+        # Count mastered = 精通+优秀+通过+熟练+内化+Level4+Level5
+        mastered = sum(counts.get(l, 0) for l in mastered_labels)
+        learned = sum(counts.get(l, 0) for l in learned_labels)
+        total_kps = sum(v for k, v in counts.items() if k in all_labels)
+        total_points += total_kps
         total_mastered += mastered
 
         courses_info.append({
@@ -308,7 +316,7 @@ def api_growth_data(user: dict = Depends(get_current_user)):
             "counts": counts,
             "learned": learned,
             "mastered": mastered,
-            "total": learned + counts.get("未评估", 0) + counts.get("未开始", 0)
+            "total": total_kps
         })
 
     # Get learning stats from storage
