@@ -295,14 +295,18 @@ def api_growth_data(user: dict = Depends(get_current_user)):
                 if f"| {label} |" in line or f"| {label} " in line:
                     counts[label] = counts.get(label, 0) + 1
 
-        # Also count from progress file
+        # Also count from progress file (handle multiple formats)
         progress_path = f"data/student/{username}/{course}_progress.md"
         if os.path.exists(progress_path):
             prog = read_file(progress_path)
             for line in prog.split('\n'):
+                # Match: 变为'精通' / 变为"精通" / '通过'→'优秀' / →'熟练' / →"内化"
                 for label in mastered_labels:
-                    if f"变为'{label}'" in line or f'变为"{label}"' in line:
+                    if (f"变为'{label}'" in line or f'变为"{label}"' in line or
+                        f"→'{label}'" in line or f'→"{label}"' in line or
+                        f"→ {label}" in line):
                         counts[label] = counts.get(label, 0) + 1
+                        break
 
         # Knowledge-based progress
         mastered = sum(counts.get(l, 0) for l in mastered_labels)
