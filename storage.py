@@ -60,27 +60,24 @@ def generate_daily_tasks_from_schedule(user_id: str) -> list:
     today = date.today().isoformat()
     courses = get_todays_courses(user_id)
     if not courses:
-        return get_daily_tasks(user_id)  # fallback to old logic
+        return get_daily_tasks(user_id)
 
     conn = get_conn()
     for i, course in enumerate(courses):
-        # If task already exists (any status), skip; otherwise create pending
-        existing = conn.execute(
-            "SELECT id FROM daily_tasks WHERE user_id=? AND date=? AND course=?",
-            (user_id, today, course)
-        ).fetchone()
-        if not existing:
-            conn.execute(
-                """INSERT INTO daily_tasks
-                   (user_id, course, date, task_order, status, duration_seconds)
-                   VALUES (?, ?, ?, ?, 'pending', 2400)""",
-                (user_id, course, today, i + 1)
-            )
-        else:
-            conn.execute(
-                "UPDATE daily_tasks SET task_order=? WHERE user_id=? AND date=? AND course=?",
-                (i + 1, user_id, today, course)
-            )
+        # Use INSERT OR REPLACE to handle any existing record gracefully
+        conn.execute(
+            """INSERT OR REPLACE INTO daily_tasks
+               (user_id, course, date, task_order, status, duration_seconds, elapsed_seconds)
+               VALUES (?, ?, ?, ?,
+                 COALESCE((SELECT status FROM daily_tasks WHERE user_id=? AND date=? AND course=? AND status='completed'), 'pending'),
+                 COALESCE((SELECT duration_seconds FROM daily_tasks WHERE user_id=? AND date=? AND course=?), 2400),
+                 COALESCE((SELECT elapsed_seconds FROM daily_tasks WHERE user_id=? AND date=? AND course=?), 0)
+               )""",
+            (user_id, course, today, i + 1,
+             user_id, today, course,
+             user_id, today, course,
+             user_id, today, course)
+        )
     conn.commit()
     conn.close()
     return get_daily_tasks(user_id)
@@ -120,7 +117,7 @@ def init_storage():
             session_id TEXT,
             knowledge_points TEXT,
             created_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(user_id, date, course, task_order)
+            UNIQUE(user_id, date, course)
         );
         CREATE INDEX IF NOT EXISTS idx_tasks_user ON daily_tasks(user_id, date);
 
@@ -141,6 +138,25 @@ def init_storage():
         conn.commit()
     except Exception:
         pass  # column already exists
+    # Migration: fix daily_tasks unique constraint (remove task_order from key)
+    try:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS daily_tasks_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL, course TEXT NOT NULL, date TEXT NOT NULL,
+                task_order INTEGER DEFAULT 1, status TEXT DEFAULT 'pending',
+                duration_seconds INTEGER DEFAULT 2400, elapsed_seconds INTEGER DEFAULT 0,
+                started_at TEXT, completed_at TEXT, session_id TEXT,
+                knowledge_points TEXT, created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(user_id, date, course)
+            );
+            INSERT OR IGNORE INTO daily_tasks_new SELECT * FROM daily_tasks;
+            DROP TABLE daily_tasks;
+            ALTER TABLE daily_tasks_new RENAME TO daily_tasks;
+        """)
+        conn.commit()
+    except Exception:
+        pass  # table already migrated
     conn.execute("CREATE INDEX IF NOT EXISTS idx_streaks_user ON learning_streaks(user_id)")
     conn.commit()
     conn.close()
