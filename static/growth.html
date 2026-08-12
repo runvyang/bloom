@@ -189,7 +189,7 @@ function render(d){
       </div>
       ${buildTree(c.course, pct, specials, branchCount)}
       <div class="progress-bar"><div class="progress-fill ${COURSES[c.course]?.color}" style="width:${pct}%"></div></div>
-      <div class="meta" style="margin-top:4px">${pct}% 已点亮</div>
+      <div class="meta" style="margin-top:4px">${pct}% · ${(c.minutes/60).toFixed(1)}h</div>
     </div>`;
   }).join('');
 }
