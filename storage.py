@@ -133,6 +133,15 @@ def init_storage():
             total_courses INTEGER DEFAULT 2,
             UNIQUE(user_id, date)
         );
+    """)
+    conn.commit()
+    # Migration: ensure total_courses column exists
+    try:
+        conn.execute("ALTER TABLE learning_streaks ADD COLUMN total_courses INTEGER DEFAULT 2")
+        conn.commit()
+    except Exception:
+        pass  # column already exists
+    conn.close()
         CREATE INDEX IF NOT EXISTS idx_streaks_user ON learning_streaks(user_id);
     """)
     conn.commit()
