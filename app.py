@@ -312,15 +312,24 @@ def api_growth_data(user: dict = Depends(get_current_user)):
         mastered = sum(counts.get(l, 0) for l in mastered_labels)
         total_kps = sum(v for k, v in counts.items() if k in all_labels)
 
-        # Time-based progress (from completed tasks, 10h=600min as 100%)
+        # Time-based progress: count completed tasks × 40min + progress file entries
         from storage import get_conn as _gc
         tc = _gc()
-        time_row = tc.execute(
-            "SELECT SUM(elapsed_seconds) as secs FROM daily_tasks WHERE user_id=? AND course=? AND status='completed'",
+        # Count completed tasks for this course
+        task_row = tc.execute(
+            "SELECT COUNT(*) as cnt FROM daily_tasks WHERE user_id=? AND course=? AND status='completed'",
+            (username, course)
+        ).fetchone()
+        completed_tasks = task_row['cnt'] if task_row else 0
+        # Also check learning_records as backup
+        rec_row = tc.execute(
+            "SELECT COUNT(*) as cnt FROM learning_records WHERE user_id=? AND course=?",
             (username, course)
         ).fetchone()
         tc.close()
-        course_minutes = (time_row['secs'] or 0) / 60 if time_row else 0
+        learning_records = rec_row['cnt'] if rec_row else 0
+        # Each completed task ≈ 40min, each learning record ≈ 1 interaction session (~5min)
+        course_minutes = completed_tasks * 40 + learning_records * 5
 
         # Blend: 50% knowledge + 50% time (capped at 100%)
         kp_pct = min(1.0, mastered / max(1, total_kps))
