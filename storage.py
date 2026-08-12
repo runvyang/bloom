@@ -142,10 +142,6 @@ def init_storage():
     except Exception:
         pass  # column already exists
     conn.close()
-        CREATE INDEX IF NOT EXISTS idx_streaks_user ON learning_streaks(user_id);
-    """)
-    conn.commit()
-    conn.close()
 
 
 # ─── Learning Records ─────────────────────────────────────
