@@ -63,20 +63,24 @@ def generate_daily_tasks_from_schedule(user_id: str) -> list:
         return get_daily_tasks(user_id)  # fallback to old logic
 
     conn = get_conn()
-    for course in courses:
-        conn.execute(
-            """INSERT OR IGNORE INTO daily_tasks
-               (user_id, course, date, task_order, status, duration_seconds)
-               VALUES (?, ?, ?, ?, 'pending', 2400)""",
-            (user_id, course, today, 0)
-        )
-    conn.commit()
-    # Update task_order based on schedule order
     for i, course in enumerate(courses):
-        conn.execute(
-            "UPDATE daily_tasks SET task_order=? WHERE user_id=? AND date=? AND course=? AND status='pending'",
-            (i+1, user_id, today, course)
-        )
+        # If task already exists (any status), skip; otherwise create pending
+        existing = conn.execute(
+            "SELECT id FROM daily_tasks WHERE user_id=? AND date=? AND course=?",
+            (user_id, today, course)
+        ).fetchone()
+        if not existing:
+            conn.execute(
+                """INSERT INTO daily_tasks
+                   (user_id, course, date, task_order, status, duration_seconds)
+                   VALUES (?, ?, ?, ?, 'pending', 2400)""",
+                (user_id, course, today, i + 1)
+            )
+        else:
+            conn.execute(
+                "UPDATE daily_tasks SET task_order=? WHERE user_id=? AND date=? AND course=?",
+                (i + 1, user_id, today, course)
+            )
     conn.commit()
     conn.close()
     return get_daily_tasks(user_id)
