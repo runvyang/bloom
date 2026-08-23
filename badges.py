@@ -134,7 +134,7 @@ def check_and_award(user_id: str) -> dict:
 
     # Which courses have been used
     courses_active = set()
-    for c in ["math","chinese","english","coding","learning"]:
+    for c in ["math","chinese","english","coding","learning","pet"]:
         if os.path.exists(f"data/student/{user_id}/{c}_state.md"):
             courses_active.add(c)
 

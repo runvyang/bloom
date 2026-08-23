@@ -162,7 +162,7 @@ def admin_course_mtimes(username: str, admin: bool = Depends(get_admin)):
     """Return max mtime of progress file + session log for each course."""
     import os as _os
     courses = []
-    for c in ["math","chinese","english","coding","oral_english","learning"]:
+    for c in ["math","chinese","english","coding","oral_english","learning","pet"]:
         mtime = 0
         for suffix in ["_progress.md", "_session.log"]:
             path = f"data/student/{username}/{c}{suffix}"
