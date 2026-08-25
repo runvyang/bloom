@@ -220,7 +220,7 @@ def generate_daily_tasks(user_id: str, target_courses: int = 2):
     recent = get_recent_records(user_id, limit=5)
     recent_courses = list(dict.fromkeys([r['course'] for r in recent]))
 
-    available = ['math', 'chinese', 'english', 'coding', 'pet']
+    available = ['math', 'chinese', 'english', 'coding', 'pet', 'elite']
     chosen = []
     for c in recent_courses:
         if c in available and c not in chosen:

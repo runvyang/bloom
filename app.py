@@ -162,7 +162,7 @@ def admin_course_mtimes(username: str, admin: bool = Depends(get_admin)):
     """Return max mtime of progress file + session log for each course."""
     import os as _os
     courses = []
-    for c in ["math","chinese","english","coding","oral_english","learning","pet"]:
+    for c in ["math","chinese","english","coding","oral_english","learning","pet","elite"]:
         mtime = 0
         for suffix in ["_progress.md", "_session.log"]:
             path = f"data/student/{username}/{c}{suffix}"
@@ -268,7 +268,7 @@ def api_growth_data(user: dict = Depends(get_current_user)):
     total_points = 0
     total_minutes = 0
 
-    available = ["math", "chinese", "english", "coding", "oral_english", "learning"]
+    available = ["math", "chinese", "english", "coding", "oral_english", "learning", "pet", "elite"]
     for course in available:
         state_path = f"data/student/{username}/{course}_map.md"
         template = f"courses/{course}/course_map.md"

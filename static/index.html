@@ -430,6 +430,7 @@ button{cursor:pointer;border:none;font-family:var(--sans);transition:all .15s;bo
         <option value="oral_english">🎙 Oral English</option>
         <option value="learning">🧠 学习科学</option>
         <option value="pet">🎯 PET冲刺</option>
+        <option value="elite">🏆 点招冲刺</option>
       </select>
       <button class="btn-icon" onclick="newSession()" title="新会话">↺</button>
       <button class="btn-icon" onclick="clearChat()" title="清空消息">🗑</button>
@@ -854,7 +855,7 @@ function loadProgress(){
   .then(d => {
     const rows = document.getElementById('progress-rows');
     if (!d.courses || !d.courses.length) { rows.innerHTML = '<div style="font-size:10px;color:var(--text3)">暂无数据</div>'; return; }
-    const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4',oral_english:'#10b981',learning:'#a855f7',pet:'#ef4444'};
+    const colors = {math:'#f59e0b',chinese:'#ec4899',english:'#6366f1',coding:'#06b6d4',oral_english:'#10b981',learning:'#a855f7',pet:'#ef4444',elite:'#f59e0b'};
     rows.innerHTML = d.courses.map(c => {
       const pct = c.blended_pct || (c.total > 0 ? Math.round(c.mastered/c.total*100) : 0);
       return `<div class="pp-row" onclick="switchToCourse('${c.course}')" title="知识点: ${Math.round((c.mastered||0)/Math.max(1,c.total||1)*100)}% · 学习: ${c.minutes||0}分钟">
