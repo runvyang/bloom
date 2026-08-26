@@ -18,9 +18,7 @@
 ## 规则 1：evidence driven
 - 词汇 recognition：学生能正确理解 ≥3 次 → 可升级
 - 词汇 application：学生能正确拼写并运用 ≥2 次 → 可升级
-- 语法：学生能在 3 个不同句子中正确运用 → 可升级
-- 阅读：单次做对不足以升级，需要连续 2 篇同类文章表现稳定
-- 写作：单篇好作文不足以升级，需要多次一致表现
+- 词族：一个词族的核心词 + 衍生词都掌握 → 可升级
 
 ## 规则 2：更新幅度限制
 单次 session 每个技能最多 +1 级 / -1 级。
@@ -49,10 +47,9 @@ vocabulary_mastery = (recognition_level + application_level) / 2
 | 类型 | 示例 | 处理 |
 |------|------|------|
 | 拼写错误 | "breakfest" | 记入拼写错误清单，安排听写 |
-| 语法错误 | 漏三单 s | 专项语法练习 |
-| 词汇误用 | much/many 混淆 | 对比教学 |
-| 搭配错误 | "make homework" | 短语专项练习 |
-| 阅读偏差 | 主旨理解错误 | 降低文章难度 |
+| 词义混淆 | much/many 混淆 | 对比教学 |
+| 词性误用 | 形容词当名词用 | 词性标注练习 |
+| 识别但不运用 | 看得懂但不会拼 | 刻意练习转化 |
 
 错误模式连续出现 2 次才记录为 delta。
 
@@ -62,6 +59,6 @@ vocabulary_mastery = (recognition_level + application_level) / 2
 
 - Principle 1: 宁可低估，不可高估
 - Principle 2: 识别不等于运用
-- Principle 3: 拼写和语法错误是独立维度
+- Principle 3: 拼写错误单独追踪
 - Principle 4: 8 周冲刺期，优先查漏补缺而非完美主义
-- Principle 5: 考试能力 > 系统知识
+- Principle 5: 词汇量是一切的基础

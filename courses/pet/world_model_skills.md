@@ -26,11 +26,11 @@ Record objective evidence during the lesson.
 
 Only record facts:
 - spelled "breakfast" correctly on first try
+- recognized 6/8 food words without hints
 - confused "much" and "many" (2nd time)
-- read A2 passage with 90% comprehension
-- wrote 5-sentence email with correct format
-- guessed "delicious" meaning correctly from context
-- forgot third-person "s" twice
+- used "delicious" correctly in a sentence
+- guessed "environment" meaning correctly from context
+- spelled "because" wrong twice
 
 Do not update mastery here. Only collect evidence.
 
@@ -40,14 +40,15 @@ Do not update mastery here. Only collect evidence.
 
 Update the student model after enough evidence.
 
-Possible updates: vocabulary mastery (recognition/application), grammar mastery, error patterns, reading level, writing ability, review queue.
+Possible updates: vocabulary mastery (recognition/application), spelling error patterns, word family mastery, review queue.
 
 Every update supported by recorded observations. Small evidence → small change. Repeated evidence → larger change.
 
 Special PET rules:
 - Vocabulary has TWO dimensions: recognition and application
-- Spelling errors tracked separately from grammar errors
-- Review queue: words/phrases needing spaced repetition
+- Spelling errors tracked separately
+- Word families tracked as a unit
+- Review queue: words needing spaced repetition
 
 ---
 
