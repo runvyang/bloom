@@ -134,10 +134,10 @@ def _collect_context(username: str) -> str:
 
     # Recent sessions
     from session_store import get_recent_rounds
-    recent = get_recent_rounds(username, "oral_english", max_rounds=10)
+    recent = get_recent_rounds(username, "oral_english", max_rounds=100)
     if recent:
         convo = "\n".join([f"{'学生' if m['role'] in ('student','user') else '老师'}: {m.get('content','')[:80]}" for m in recent[-20:]])
-        parts.append("最近对话:\n" + convo[:800])
+        parts.append("最近对话:\n" + convo[:2000])
 
     return "\n\n".join(parts)
 
@@ -162,7 +162,7 @@ async def get_prompt(username: str = "") -> str:
 4. 指令要简单直接，voice teacher 的智能有限，不要复杂逻辑
 
 学生情况:
-{context[:3000]}
+{context[:10000]}
 
 请直接输出给 voice teacher 的 system prompt（英文，≤200字）："""
 
