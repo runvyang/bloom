@@ -103,54 +103,81 @@ def parse_response(data: bytes):
     return result
 
 
-def get_prompt(username: str = "") -> str:
-    """Build system prompt with course map + progress + recent sessions."""
-    base = "You are a friendly English teacher helping a young Chinese student practice spoken English for the PET exam. Speak clearly at moderate speed. Encourage the student."
+def _collect_context(username: str) -> str:
+    """Collect full context (course map + progress + recent sessions) for the general LLM."""
+    parts = []
 
-    # Course prompt
-    path = "courses/oral_english/world_model.md"
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            base = f.read()[:400]
+    # Course map
+    map_path = f"data/student/{username}/oral_english_map.md"
+    template = "courses/oral_english/course_map.md"
+    if not os.path.exists(map_path) and os.path.exists(template):
+        copy_file(template, map_path)
+    if os.path.exists(map_path):
+        parts.append("课程知识点:\n" + read_file(map_path)[:1500])
 
-    if username:
-        # Course map (knowledge points)
-        map_path = f"data/student/{username}/oral_english_map.md"
-        template = "courses/oral_english/course_map.md"
-        if not os.path.exists(map_path) and os.path.exists(template):
-            copy_file(template, map_path)
-        if os.path.exists(map_path):
-            content = read_file(map_path)
-            lines = content.split('\n')
-            body = '\n'.join(lines[10:]) if len(lines) > 10 else content
-            base += f"\n\nStudent's skill levels:\n{body[:300]}"
+    # Progress (auto-merge if >10)
+    progress_path = f"data/student/{username}/oral_english_progress.md"
+    if os.path.exists(progress_path):
+        progress = read_file(progress_path)
+        if progress.count("# DELTA UPDATE") > 10:
+            try:
+                from runtime import _merge_progress_to_map
+                map_content = read_file(map_path) if os.path.exists(map_path) else ""
+                merged = _merge_progress_to_map(map_content, progress)
+                write_file(map_path, merged)
+                write_file(progress_path, "")
+                progress = ""
+            except Exception:
+                pass
+        if progress.strip():
+            parts.append("学生进展:\n" + progress[:1000])
 
-        # Progress (all delta updates) — auto-merge if >10
-        progress_path = f"data/student/{username}/oral_english_progress.md"
-        if os.path.exists(progress_path):
-            progress = read_file(progress_path)
-            if progress.count("# DELTA UPDATE") > 10:
-                try:
-                    from runtime import _merge_progress_to_map
-                    map_content = read_file(map_path) if os.path.exists(map_path) else ""
-                    merged = _merge_progress_to_map(map_content, progress)
-                    write_file(map_path, merged)
-                    write_file(progress_path, "")
-                    progress = ""
-                except Exception:
-                    pass
-            if progress.strip():
-                base += f"\n\nProgress:\n{progress[:800]}"
+    # Recent sessions
+    from session_store import get_recent_rounds
+    recent = get_recent_rounds(username, "oral_english", max_rounds=10)
+    if recent:
+        convo = "\n".join([f"{'学生' if m['role'] in ('student','user') else '老师'}: {m.get('content','')[:80]}" for m in recent[-20:]])
+        parts.append("最近对话:\n" + convo[:800])
 
-        # Recent 10 sessions (brief)
-        from session_store import get_recent_rounds
-        recent = get_recent_rounds(username, "oral_english", max_rounds=10)
-        if recent:
-            convo = "\n".join([f"{'S' if m['role'] in ('student','user') else 'T'}: {m.get('content','')[:100]}" for m in recent[-20:]])
-            base += f"\n\nRecent conversations:\n{convo[:500]}"
+    return "\n\n".join(parts)
 
-    print(base)
-    return base[:2000]
+
+async def get_prompt(username: str = "") -> str:
+    """Use the general LLM to synthesize a concise prompt for the voice LLM.
+
+    The voice LLM (Volcengine) can't handle long/complex prompts, so the general
+    LLM distills full context into: today's knowledge point + brief student profile.
+    """
+    if not username:
+        return "You are a friendly English teacher helping a young Chinese student practice spoken English for the PET exam. Speak clearly, use short sentences, encourage the student."
+
+    context = _collect_context(username)
+
+    synthesis_prompt = f"""你是英语口语课程的教学规划师。请根据以下学生情况，为一位"语音英语老师"生成简洁的指令（不超过200字）。
+
+要求：
+1. 只包含：今天要练习的1个具体知识点/话题 + 学生的简要水平说明
+2. 指出学生最近已经练过的内容，避免重复
+3. 用英语输出指令（voice teacher 是英文老师）
+4. 指令要简单直接，voice teacher 的智能有限，不要复杂逻辑
+
+学生情况:
+{context[:3000]}
+
+请直接输出给 voice teacher 的 system prompt（英文，≤200字）："""
+
+    llm = OpenRouterClient()
+    try:
+        resp = llm.chat([{"role": "user", "content": synthesis_prompt}], stream=False)
+        prompt = resp.choices[0].message.content.strip()
+        # Cap at ~500 chars for the voice LLM
+        if len(prompt) > 500:
+            prompt = prompt[:500]
+        print(f"[voice] synthesized prompt ({len(prompt)} chars): {prompt[:100]}...")
+        return prompt
+    except Exception as e:
+        print(f"[voice] prompt synthesis failed: {e}")
+        return "You are a friendly English teacher helping a young Chinese student practice spoken English for the PET exam. Speak clearly, use short sentences, encourage the student."
 
 # ─── Main handler ───
 
@@ -186,7 +213,7 @@ async def handle_voice(ws):
         # StartSession
         ss_payload = {
             "asr": {"audio_info": {"format": "pcm", "sample_rate": 16000, "channel": 1}, "extra": {}},
-            "dialog": {"bot_name": "Teacher", "system_role": get_prompt(username),
+            "dialog": {"bot_name": "Teacher", "system_role": await get_prompt(username),
                        "speaking_style": "friendly", "extra": {"model": "1.2.1.1", "recv_timeout": 120}},
             "tts": {"speaker": "zh_female_vv_jupiter_bigtts",
                     "audio_config": {"channel": 1, "format": "pcm_s16le", "sample_rate": 24000,
